@@ -1,0 +1,26 @@
+{
+  "name": "figma-sync",
+  "id": "figma-sync-plugin-dev",
+  "api": "1.0.0",
+  "editorType": ["figma"],
+  "main": "dist/main.js",
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": [
+      "http://localhost",
+      "http://localhost:7001"
+    ],
+    "reasoning": "Connect to the local figma-sync HTTP server running on the developer's machine."
+  },
+  "menu": [
+    {
+      "name": "Bootstrap from code",
+      "command": "bootstrap-from-code"
+    },
+    {
+      "name": "Export changes",
+      "command": "export-changes"
+    }
+  ]
+}
+

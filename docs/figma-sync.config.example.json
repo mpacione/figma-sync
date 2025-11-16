@@ -1,0 +1,28 @@
+{
+  "projectName": "My Next.js App",
+  "paths": {
+    "uiComponentsGlob": "src/components/ui/**/*",
+    "screenComponentsGlob": "app/**/page.tsx",
+    "cssVariablesFiles": ["src/styles/tokens.css"],
+    "tailwindConfig": "tailwind.config.ts"
+  },
+  "figma": {
+    "fileKey": "YOUR_FIGMA_FILE_KEY",
+    "pages": {
+      "primitives": "System/Primitives",
+      "patterns": "System/Patterns",
+      "screens": "App/Screens"
+    }
+  },
+  "llm": {
+    "provider": "openai",
+    "model": "gpt-4.1-mini",
+    "temperature": 0.2,
+    "maxTokens": 1024
+  },
+  "heuristics": {
+    "primitiveComponentPatterns": ["Button", "Input", "Card"],
+    "excludeComponents": []
+  }
+}
+

@@ -1,0 +1,13 @@
+{
+  "name": "figma-sync-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "figma-sync-core": "0.1.0"
+  }
+}
+

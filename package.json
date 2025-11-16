@@ -1,0 +1,24 @@
+{
+  "name": "figma-sync",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --prefix packages/core && npm run build --prefix packages/cli && npm run build --prefix packages/plugin",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "cli": "node packages/cli/dist/index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0",
+    "zod": "^3.23.8"
+  }
+}
+
