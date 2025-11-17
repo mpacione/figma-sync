@@ -89,7 +89,9 @@ export async function runWizardCommand(
 
   // Load config and ensure API key is available
   const config = await loadConfigFromFile(absConfigPath);
-  await ensureOpenAiApiKey(config.llm.provider);
+  if (config.llm) {
+    await ensureOpenAiApiKey(config.llm.provider);
+  }
 
   // 1) Scan + generate-spec
   // eslint-disable-next-line no-console

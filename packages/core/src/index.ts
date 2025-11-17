@@ -14,6 +14,8 @@ export * from './analysis/screens';
 export * from './analysis/buildCodeModel';
 export * from './llm/types';
 export * from './llm/jsonClient';
+export * from './llm/modelValidation';
+export * from './prompts';
 export * from './spec/buildDesignSpec';
 export * from './spec/enrichComponentsWithLLM';
 export * from './spec/buildFigmaInstructionSet';

@@ -17,9 +17,14 @@ function classifyComponentKind(
 
 function extractExportedComponentNames(sourceFile: ts.SourceFile): string[] {
   const names = new Set<string>();
+  const declaredNames = new Set<string>();
 
+  // First pass: collect all declared function/const names that start with uppercase
   sourceFile.forEachChild((node) => {
     if (ts.isFunctionDeclaration(node) && node.name) {
+      if (/^[A-Z]/.test(node.name.text)) {
+        declaredNames.add(node.name.text);
+      }
       const hasExport =
         node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ??
         false;
@@ -32,10 +37,25 @@ function extractExportedComponentNames(sourceFile: ts.SourceFile): string[] {
       const isExported =
         node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword) ??
         false;
-      if (!isExported) return;
       for (const decl of node.declarationList.declarations) {
         if (ts.isIdentifier(decl.name) && /^[A-Z]/.test(decl.name.text)) {
-          names.add(decl.name.text);
+          declaredNames.add(decl.name.text);
+          if (isExported) {
+            names.add(decl.name.text);
+          }
+        }
+      }
+    }
+
+    // Handle export { Button, Card } syntax
+    if (ts.isExportDeclaration(node) && node.exportClause) {
+      if (ts.isNamedExports(node.exportClause)) {
+        for (const element of node.exportClause.elements) {
+          const exportedName = element.name.text;
+          // Only include if it's a declared component (starts with uppercase)
+          if (declaredNames.has(exportedName)) {
+            names.add(exportedName);
+          }
         }
       }
     }

@@ -10,18 +10,19 @@ const OPENAI_CHAT_COMPLETIONS_URL = 'https://api.openai.com/v1/chat/completions'
 class OpenAIChatRawClient implements RawLLMClient {
   constructor(
     private readonly apiKey: string,
-    private readonly llmConfig: FigmaSyncConfig['llm'],
+    private readonly llmConfig: NonNullable<FigmaSyncConfig['llm']>,
     private readonly fetchImpl: FetchLike,
   ) {}
 
   async generate(prompt: string, options?: LLMGenerateOptions): Promise<string> {
     const temperature = options?.temperature ?? this.llmConfig.temperature;
     const maxTokens = options?.maxTokens ?? this.llmConfig.maxTokens;
+    const systemPrompt = options?.systemPrompt ?? 'You are a helpful assistant.';
 
     const body = {
       model: this.llmConfig.model,
       messages: [
-        { role: 'system', content: 'You are a helpful assistant.' },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt },
       ],
       temperature,
@@ -63,7 +64,7 @@ class OpenAIChatRawClient implements RawLLMClient {
 export function createOpenAiLLMClientFromEnv(
   config: FigmaSyncConfig,
 ): LLMClient | null {
-  if (config.llm.provider !== 'openai') {
+  if (!config.llm || config.llm.provider !== 'openai') {
     return null;
   }
 

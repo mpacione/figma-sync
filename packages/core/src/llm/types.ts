@@ -5,6 +5,7 @@ import type { ZodSchema } from 'zod';
 export interface LLMGenerateOptions {
   temperature?: number;
   maxTokens?: number;
+  systemPrompt?: string;
 }
 
 export interface RawLLMClient {

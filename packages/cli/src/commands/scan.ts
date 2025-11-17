@@ -2,10 +2,12 @@ import path from 'node:path';
 import type { FigmaSyncConfig, ProjectMeta } from 'figma-sync-core';
 import {
   buildCodeModel,
+  validateModel,
   type CssSourceFile,
   type ComponentSourceFile,
   type ScreenSourceFile,
 } from 'figma-sync-core';
+import { discoverProjectPaths } from '../utils/pathDiscovery';
 
 export interface ScanDeps {
   loadConfigFromFile: (configPath: string) => Promise<FigmaSyncConfig>;
@@ -16,11 +18,102 @@ export interface ScanDeps {
   cwd: string;
 }
 
+export interface ScanOptions {
+  autoFix?: boolean;
+}
+
 export async function runScan(
   configPath: string,
   deps: ScanDeps,
+  options: ScanOptions = {},
 ): Promise<void> {
   const config = await deps.loadConfigFromFile(configPath);
+
+  // Validate LLM configuration if present
+  if (config.llm) {
+    const validation = validateModel(config.llm.provider, config.llm.model);
+    if (!validation.isValid && validation.warning) {
+      // eslint-disable-next-line no-console
+      console.log(`  [scan] [warn] ${validation.warning}`);
+      if (validation.suggestion) {
+        // eslint-disable-next-line no-console
+        console.log(`  [scan] [info] Consider updating your config to use: "${validation.suggestion}"`);
+      }
+    }
+  }
+
+  // Validate paths and discover alternatives if needed
+  // eslint-disable-next-line no-console
+  console.log('  [scan] Validating configured paths...');
+  const discoveryResult = await discoverProjectPaths(deps.cwd);
+
+  // Check if configured paths exist, use discovery as fallback
+  let uiComponentsGlob = config.paths.uiComponentsGlob;
+  let screenComponentsGlob = config.paths.screenComponentsGlob;
+  let cssVariablesFiles = config.paths.cssVariablesFiles;
+
+  // Validate UI components glob
+  const uiComponentPaths = await deps.glob(uiComponentsGlob, deps.cwd);
+  if (uiComponentPaths.length === 0 && discoveryResult.paths.uiComponentsGlob) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `  [scan] [warn] No files found for uiComponentsGlob: "${uiComponentsGlob}"`,
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      `  [scan] [info] Using discovered pattern: "${discoveryResult.paths.uiComponentsGlob}"`,
+    );
+    uiComponentsGlob = discoveryResult.paths.uiComponentsGlob;
+  }
+
+  // Validate screen components glob
+  const screenPathsCheck = await deps.glob(screenComponentsGlob, deps.cwd);
+  if (
+    screenPathsCheck.length === 0 &&
+    discoveryResult.paths.screenComponentsGlob
+  ) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `  [scan] [warn] No files found for screenComponentsGlob: "${screenComponentsGlob}"`,
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      `  [scan] [info] Using discovered pattern: "${discoveryResult.paths.screenComponentsGlob}"`,
+    );
+    screenComponentsGlob = discoveryResult.paths.screenComponentsGlob;
+  }
+
+  // Validate CSS files
+  const missingCssFiles: string[] = [];
+  for (const rel of cssVariablesFiles) {
+    const abs = path.resolve(deps.cwd, rel);
+    try {
+      await deps.readFile(abs);
+    } catch (error) {
+      const code = (error as any)?.code as string | undefined;
+      if (code === 'ENOENT') {
+        missingCssFiles.push(rel);
+      }
+    }
+  }
+
+  if (
+    missingCssFiles.length > 0 &&
+    discoveryResult.paths.cssVariablesFiles.length > 0
+  ) {
+    // eslint-disable-next-line no-console
+    console.log(
+      `  [scan] [warn] ${missingCssFiles.length} CSS file(s) not found: ${missingCssFiles.join(', ')}`,
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      `  [scan] [info] Using discovered CSS files: ${discoveryResult.paths.cssVariablesFiles.join(', ')}`,
+    );
+    cssVariablesFiles = discoveryResult.paths.cssVariablesFiles as [
+      string,
+      ...string[],
+    ];
+  }
 
   const projectMeta: ProjectMeta = {
     name: config.projectName,
@@ -30,12 +123,11 @@ export async function runScan(
 
   // 1) CSS variables / design tokens
   const cssFiles: CssSourceFile[] = [];
-  const missingCssFiles: string[] = [];
   // eslint-disable-next-line no-console
   console.log(
     '  [scan] Reading CSS variables files from config.paths.cssVariablesFiles ...',
   );
-  for (const rel of config.paths.cssVariablesFiles) {
+  for (const rel of cssVariablesFiles) {
     const abs = path.resolve(deps.cwd, rel);
     try {
       const content = await deps.readFile(abs);
@@ -43,7 +135,6 @@ export async function runScan(
     } catch (error) {
       const code = (error as any)?.code as string | undefined;
       if (code === 'ENOENT') {
-        missingCssFiles.push(abs);
         // eslint-disable-next-line no-console
         console.log(
           `  [scan] [warn] CSS variables file not found: ${abs} (skipping).`,
@@ -55,18 +146,15 @@ export async function runScan(
   }
   // eslint-disable-next-line no-console
   console.log(
-    `  [scan] CSS variables sources: ${cssFiles.length} loaded, ${missingCssFiles.length} missing (of ${config.paths.cssVariablesFiles.length} configured).`,
+    `  [scan] CSS variables sources: ${cssFiles.length} loaded.`,
   );
 
   // 2) Component sources
   // eslint-disable-next-line no-console
   console.log(
-    `  [scan] Discovering UI component source files via glob "${config.paths.uiComponentsGlob}" ...`,
+    `  [scan] Discovering UI component source files via glob "${uiComponentsGlob}" ...`,
   );
-  const componentPaths = await deps.glob(
-    config.paths.uiComponentsGlob,
-    deps.cwd,
-  );
+  const componentPaths = await deps.glob(uiComponentsGlob, deps.cwd);
   // eslint-disable-next-line no-console
   console.log(
     `  [scan] Found ${componentPaths.length} component file(s). Reading contents...`,
@@ -81,12 +169,9 @@ export async function runScan(
   // 3) Screen route sources
   // eslint-disable-next-line no-console
   console.log(
-    `  [scan] Discovering screen route files via glob "${config.paths.screenComponentsGlob}" ...`,
+    `  [scan] Discovering screen route files via glob "${screenComponentsGlob}" ...`,
   );
-  const screenPaths = await deps.glob(
-    config.paths.screenComponentsGlob,
-    deps.cwd,
-  );
+  const screenPaths = await deps.glob(screenComponentsGlob, deps.cwd);
   // eslint-disable-next-line no-console
   console.log(
     `  [scan] Found ${screenPaths.length} screen file(s). Reading contents...`,

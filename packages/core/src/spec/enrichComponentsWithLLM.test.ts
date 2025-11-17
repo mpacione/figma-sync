@@ -76,28 +76,28 @@ describe('enrichDesignComponentsWithLLM', () => {
   it('merges LLM-provided props and example variants into components', async () => {
     const baseSpec = buildDesignSpec(codeModel, config);
 
-    const llmResult = {
-      components: [
+    // LLM returns enrichment data with new schema structure
+    const llmEnrichment = {
+      propsModel: {
+        variantProps: [
+          { name: 'variant', values: ['primary', 'secondary'] },
+          { name: 'disabled', values: ['true', 'false'] },
+        ],
+        slotProps: [{ name: 'icon', description: 'Optional icon element' }],
+      },
+      exampleVariants: [
         {
-          name: 'Button',
-          propsModel: {
-            variantProps: [
-              { name: 'variant', type: 'enum', values: ['primary', 'secondary'] },
-              { name: 'disabled', type: 'boolean' },
-            ],
-            slotProps: [{ name: 'icon' }],
-          },
-          exampleVariants: [
-            {
-              name: 'Primary',
-              props: { variant: 'primary', disabled: false },
-            },
-          ],
+          name: 'Primary',
+          props: { variant: 'primary', disabled: false },
         },
       ],
+      figmaMetadata: {
+        shouldCreateVariants: true,
+        recommendedLayout: 'grid',
+      },
     };
 
-    const llm = createFakeLLM(llmResult);
+    const llm = createFakeLLM(llmEnrichment);
 
     const enriched = await enrichDesignComponentsWithLLM(
       codeModel,
@@ -108,11 +108,14 @@ describe('enrichDesignComponentsWithLLM', () => {
     expect(enriched).toHaveLength(1);
     const button = enriched[0];
 
-    expect(button.propsModel.variantProps).toEqual(llmResult.components[0].propsModel.variantProps);
+    // Check that variant props were converted to the right format
+    expect(button.propsModel.variantProps).toEqual([
+      { name: 'variant', type: 'enum', values: ['primary', 'secondary'] },
+      { name: 'disabled', type: 'enum', values: ['true', 'false'] },
+    ]);
+    expect(button.propsModel.slotProps).toEqual([{ name: 'icon', description: 'Optional icon element' }]);
     expect(button.exampleVariants[0].name).toBe('Primary');
-    expect(button.exampleVariants[0].props).toEqual(
-      llmResult.components[0].exampleVariants[0].props,
-    );
+    expect(button.exampleVariants[0].props).toEqual({ variant: 'primary', disabled: false });
     expect(button.exampleVariants[0].id).toMatch(/^component-0-ex-0$/);
   });
 

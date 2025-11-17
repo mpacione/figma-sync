@@ -9,6 +9,7 @@ import {
   runServeWithNodeEnv,
   runGeneratePatchesWithNodeEnv,
   runApplyPatchesWithNodeEnv,
+  runDiagnoseWithNodeEnv,
 } from './io/nodeEnv';
 import { runInitCommand } from './commands/init';
 import { runWizardCommand } from './commands/wizard';
@@ -20,6 +21,7 @@ export interface CliHandlers {
   runGeneratePatches: (configPath: string, projectRoot?: string) => Promise<void>;
   runApplyPatches: (configPath: string, projectRoot?: string) => Promise<void>;
   runValidate: (configPath: string, projectRoot?: string) => Promise<void>;
+  runDiagnose: (configPath: string, projectRoot?: string) => Promise<void>;
 }
 
 const defaultHandlers: CliHandlers = {
@@ -32,6 +34,7 @@ const defaultHandlers: CliHandlers = {
   runApplyPatches: (configPath, projectRoot) =>
     runApplyPatchesWithNodeEnv(configPath, projectRoot),
   runValidate: (configPath, projectRoot) => runValidateWithNodeEnv(configPath, projectRoot),
+  runDiagnose: (configPath, projectRoot) => runDiagnoseWithNodeEnv(configPath, projectRoot),
 };
 
 function withConfigOption(cmd: Command): Command {
@@ -99,6 +102,14 @@ export function createProgram(handlers: CliHandlers = defaultHandlers): Command 
       .description('Validate figma-sync config and schemas'),
   ).action(async (opts: { config: string }) => {
     await handlers.runValidate(opts.config, getProjectRoot());
+  });
+
+  withConfigOption(
+    program
+      .command('diagnose')
+      .description('Check configuration paths and suggest corrections'),
+  ).action(async (opts: { config: string }) => {
+    await handlers.runDiagnose(opts.config, getProjectRoot());
   });
 
   program

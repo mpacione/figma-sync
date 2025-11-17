@@ -7,6 +7,7 @@ import { runValidate, type ValidateDeps } from '../commands/validate';
 import { createServeHandler, type ServeDeps } from '../commands/serve';
 import { runGeneratePatches, type GeneratePatchesDeps } from '../commands/generatePatches';
 import { runApplyPatches, type ApplyPatchesDeps } from '../commands/applyPatches';
+import { runDiagnose, type DiagnoseDeps } from '../commands/diagnose';
 import { loadConfigFromFile } from '../config/loadConfig';
 import { createOpenAiLLMClientFromEnv } from '../llm/openaiClient';
 
@@ -322,5 +323,27 @@ export async function runApplyPatchesWithNodeEnv(
     // eslint-disable-next-line no-console
     console.log('  [ok] Applied any patches described in artifacts/code-patches.json');
   });
+}
+
+function createNodeDiagnoseDeps(cwd: string): DiagnoseDeps {
+  return {
+    loadConfigFromFile,
+    readFile: async (filePath: string) => {
+      return fs.readFile(filePath, 'utf-8');
+    },
+    glob: async (pattern: string, cwdOverride: string) => {
+      return simpleGlob(pattern, cwdOverride);
+    },
+    cwd,
+  };
+}
+
+export async function runDiagnoseWithNodeEnv(
+  configPath: string,
+  projectRoot?: string,
+): Promise<void> {
+  const cwd = resolveProjectRoot(projectRoot);
+  const deps = createNodeDiagnoseDeps(cwd);
+  await runDiagnose(configPath, deps);
 }
 

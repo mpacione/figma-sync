@@ -53,6 +53,12 @@ function logConfigAndEnvSummary(
     `  figma.pages: primitives="${config.figma.pages.primitives}", patterns="${config.figma.pages.patterns}", screens="${config.figma.pages.screens}"`,
   );
 
+  if (!config.llm) {
+    // eslint-disable-next-line no-console
+    console.log('  [info] No LLM configuration found - LLM enrichment will be skipped.');
+    return;
+  }
+
   const provider = config.llm.provider;
   const hasOpenAiKey = !!process.env.FIGMA_SYNC_OPENAI_API_KEY;
   if (provider === 'openai') {
@@ -83,7 +89,9 @@ export async function runGenerateSpec(
   const config = await deps.loadConfigFromFile(configPath);
 
   // Ensure API key is available if needed
-  await ensureOpenAiApiKey(config.llm.provider);
+  if (config.llm) {
+    await ensureOpenAiApiKey(config.llm.provider);
+  }
 
   logConfigAndEnvSummary(config, configPath);
 
@@ -107,7 +115,7 @@ export async function runGenerateSpec(
   const baseSpec = buildDesignSpec(codeModel, config);
 
   let finalSpec = baseSpec;
-  if (deps.createLLMClient) {
+  if (deps.createLLMClient && config.llm) {
     const llm = deps.createLLMClient(config);
     if (llm) {
       const enrichmentStart = Date.now();
@@ -119,6 +127,7 @@ export async function runGenerateSpec(
         codeModel,
         baseSpec.components,
         llm,
+        deps.readFile,
       );
       const elapsedSeconds = ((Date.now() - enrichmentStart) / 1000).toFixed(1);
       // eslint-disable-next-line no-console

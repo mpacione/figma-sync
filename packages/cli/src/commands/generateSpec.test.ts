@@ -140,21 +140,20 @@ describe('runGenerateSpec', () => {
       },
       async generateJSON(prompt, schema) {
         llmPrompts.push(prompt);
+        // Return enrichment data with new schema structure
         return schema.parse({
-          components: [
-            {
-              name: 'Button',
-              propsModel: {
-                variantProps: [
-                  { name: 'variant', type: 'enum', values: ['primary', 'secondary'] },
-                ],
-                slotProps: [],
-              },
-              exampleVariants: [
-                { name: 'Primary', props: { variant: 'primary' } },
-              ],
-            },
+          propsModel: {
+            variantProps: [
+              { name: 'variant', values: ['primary', 'secondary'] },
+            ],
+            slotProps: [],
+          },
+          exampleVariants: [
+            { name: 'Primary', props: { variant: 'primary' } },
           ],
+          figmaMetadata: {
+            shouldCreateVariants: true,
+          },
         }) as any;
       },
     };

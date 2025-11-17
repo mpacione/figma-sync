@@ -105,6 +105,24 @@ async function fetchInstructionSet(
 async function applyInstructions(instructions: FigmaInstructionSet): Promise<void> {
   const nodeRefs = new Map<string, any>();
 
+  // Load default font for text creation
+  let fontLoaded = false;
+  try {
+    await figma.loadFontAsync({ family: 'Inter', style: 'Regular' });
+    fontLoaded = true;
+  } catch (error) {
+    // If Inter is not available, try loading the default font
+    try {
+      await figma.loadFontAsync({ family: 'Roboto', style: 'Regular' });
+      fontLoaded = true;
+    } catch (error2) {
+      // Font loading failed, we'll skip text creation
+      if (figma.notify) {
+        figma.notify('Warning: Could not load fonts, components will be created without text labels');
+      }
+    }
+  }
+
   for (const op of instructions.operations) {
     switch (op.type) {
       case 'CreatePage': {
@@ -143,6 +161,75 @@ async function applyInstructions(instructions: FigmaInstructionSet): Promise<voi
         }
         const component = figma.createComponent();
         component.name = op.name;
+
+        // Get visual properties from the operation
+        const visualProps = op.visualProperties || {};
+        const padding = {
+          left: visualProps.paddingLeft || 16,
+          right: visualProps.paddingRight || 16,
+          top: visualProps.paddingTop || 8,
+          bottom: visualProps.paddingBottom || 8,
+        };
+        const minWidth = visualProps.minWidth || 100;
+        const minHeight = visualProps.minHeight || 40;
+
+        // Create a background rectangle with visual properties
+        const background = figma.createRectangle();
+        background.name = 'Background';
+
+        // Apply fills
+        if (visualProps.fills && visualProps.fills.length > 0) {
+          background.fills = visualProps.fills;
+        } else {
+          // Default fill
+          background.fills = [{ type: 'SOLID', color: { r: 0.95, g: 0.95, b: 0.95 } }];
+        }
+
+        // Apply strokes
+        if (visualProps.strokes && visualProps.strokes.length > 0) {
+          background.strokes = visualProps.strokes;
+          background.strokeWeight = visualProps.strokeWeight || 1;
+        }
+
+        // Apply corner radius
+        if (visualProps.cornerRadius !== undefined) {
+          background.cornerRadius = visualProps.cornerRadius;
+        }
+
+        component.appendChild(background);
+
+        // Add text label with the component name
+        if (fontLoaded) {
+          const text = figma.createText();
+          text.name = 'Label';
+          text.characters = op.name.split('/')[0]; // Use just the component name, not the variant path
+          text.fontSize = 14;
+          text.x = padding.left;
+          text.y = padding.top;
+
+          // Set text color based on background (simple heuristic)
+          const bgFill = visualProps.fills && visualProps.fills[0];
+          if (bgFill && bgFill.color) {
+            const brightness = (bgFill.color.r + bgFill.color.g + bgFill.color.b) / 3;
+            const textColor = brightness > 0.5 ? { r: 0, g: 0, b: 0 } : { r: 1, g: 1, b: 1 };
+            text.fills = [{ type: 'SOLID', color: textColor }];
+          }
+
+          component.appendChild(text);
+
+          // Calculate component size based on text and padding
+          const componentWidth = Math.max(minWidth, text.width + padding.left + padding.right);
+          const componentHeight = Math.max(minHeight, text.height + padding.top + padding.bottom);
+
+          // Resize background and component
+          background.resize(componentWidth, componentHeight);
+          component.resize(componentWidth, componentHeight);
+        } else {
+          // If fonts aren't loaded, just use min size
+          background.resize(minWidth, minHeight);
+          component.resize(minWidth, minHeight);
+        }
+
         page.appendChild(component);
         if (component.setPluginData) {
           component.setPluginData(
@@ -152,6 +239,44 @@ async function applyInstructions(instructions: FigmaInstructionSet): Promise<voi
           component.setPluginData(PLUGIN_KEY_ORIGINAL_NAME, op.name);
         }
         nodeRefs.set(op.componentId, component);
+        break;
+      }
+      case 'CreateComponentSet': {
+        // Collect all component nodes that should be combined
+        const componentNodes: any[] = [];
+        for (const componentId of op.componentIds) {
+          const node = nodeRefs.get(componentId);
+          if (node) {
+            componentNodes.push(node);
+          }
+        }
+
+        if (componentNodes.length === 0) {
+          if (figma.notify) {
+            figma.notify(`No components found for component set ${op.componentSetId}`);
+          }
+          break;
+        }
+
+        // Get the parent (should be the page)
+        const parent = componentNodes[0].parent;
+        if (!parent) {
+          if (figma.notify) {
+            figma.notify(`No parent found for component set ${op.componentSetId}`);
+          }
+          break;
+        }
+
+        // Combine components as variants
+        if (typeof figma.combineAsVariants !== 'function') {
+          if (figma.notify) {
+            figma.notify('combineAsVariants API not available in this Figma environment');
+          }
+          break;
+        }
+
+        const componentSet = figma.combineAsVariants(componentNodes, parent);
+        nodeRefs.set(op.componentSetId, componentSet);
         break;
       }
       case 'CreateVariableCollection': {

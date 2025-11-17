@@ -56,12 +56,39 @@ const zCreateVariableOp = zBaseOperation.extend({
   scopes: z.array(z.string()).default([]),
 });
 
+const zFigmaColor = z.object({
+  r: z.number().min(0).max(1),
+  g: z.number().min(0).max(1),
+  b: z.number().min(0).max(1),
+  a: z.number().min(0).max(1).optional(),
+});
+
+const zFigmaPaint = z.object({
+  type: z.enum(['SOLID']),
+  color: zFigmaColor,
+  opacity: z.number().min(0).max(1).optional(),
+});
+
+const zVisualProperties = z.object({
+  fills: z.array(zFigmaPaint).optional(),
+  strokes: z.array(zFigmaPaint).optional(),
+  strokeWeight: z.number().optional(),
+  cornerRadius: z.number().optional(),
+  paddingLeft: z.number().optional(),
+  paddingRight: z.number().optional(),
+  paddingTop: z.number().optional(),
+  paddingBottom: z.number().optional(),
+  minWidth: z.number().optional(),
+  minHeight: z.number().optional(),
+}).optional();
+
 const zCreateComponentOp = zBaseOperation.extend({
   type: z.literal('CreateComponent'),
   componentId: z.string(),
   designComponentId: z.string(),
   pageId: z.string(),
   name: z.string(),
+  visualProperties: zVisualProperties,
 });
 
 const zCreateComponentSetOp = zBaseOperation.extend({

@@ -66,6 +66,10 @@ async function runPluginWithEnv(setup: (ctx: any) => void) {
         appendChild(child: any) {
           this.children.push(child);
         },
+        resize(width: number, height: number) {
+          this.width = width;
+          this.height = height;
+        },
         _data: {} as Record<string, string>,
         setPluginData(key: string, value: string) {
           this._data[key] = value;
@@ -76,6 +80,36 @@ async function runPluginWithEnv(setup: (ctx: any) => void) {
       };
       return component;
     }),
+    createText: vi.fn(() => {
+      const text: any = {
+        characters: '',
+        fontSize: 14,
+        x: 0,
+        y: 0,
+        width: 50,
+        height: 20,
+      };
+      return text;
+    }),
+    createRectangle: vi.fn(() => {
+      const rect: any = {
+        fills: [],
+        resize(width: number, height: number) {
+          this.width = width;
+          this.height = height;
+        },
+      };
+      return rect;
+    }),
+    combineAsVariants: vi.fn((nodes: any[], parent: any) => {
+      const componentSet: any = {
+        name: 'Component Set',
+        children: nodes,
+        parent,
+      };
+      return componentSet;
+    }),
+    loadFontAsync: vi.fn().mockResolvedValue(undefined),
     closePlugin: () => closeResolve(),
   };
 
