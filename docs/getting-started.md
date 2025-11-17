@@ -56,12 +56,8 @@ You can always come back to the detailed steps below if you want to understand o
    - In your app folder, create `figma-sync.config.json` at the project root and copy the example from `docs/figma-sync.config.example.json` in this repo. Adjust the paths to match your app structure.
 
 3. **Set your OpenAI API key (optional)**
-   - In your app folder, add your OpenAI API key to your environment. For example, in a `.env` file:
-
-     ```bash
-     FIGMA_SYNC_OPENAI_API_KEY=sk-...
-     ```
-
+   - When you run `figma-sync generate-spec` or `figma-sync wizard`, the tool will automatically prompt you to paste your OpenAI API key if it's not already configured.
+   - The key will be saved to the figma-sync repository's `.env` file (not your app folder).
    - This is optional. If you skip it, figma-sync will still work but will skip LLM-based enrichment.
 
 4. **Generate artifacts from your code**
@@ -234,17 +230,21 @@ Adjust the globs and paths to match your app.
 
 ## 4. Configure your OpenAI API key (optional but recommended)
 
-In your **app repo**:
+The figma-sync CLI will automatically prompt you for your OpenAI API key when you run commands that need it (like `generate-spec` or `wizard`).
 
-1. Add `FIGMA_SYNC_OPENAI_API_KEY` to your local environment (for example, in a `.env` file that you load via your dev tooling):
+If you prefer to set it up manually:
 
-   - `FIGMA_SYNC_OPENAI_API_KEY=sk-...`
+1. In the **figma-sync repository** (not your app repo), create a `.env` file at the root:
+
+   ```bash
+   FIGMA_SYNC_OPENAI_API_KEY=sk-...
+   ```
 
 2. Ensure your config has:
 
    - `llm.provider = "openai"`
 
-If the env var is missing, `figma-sync` will still run but will skip LLM-based enrichment.
+If the API key is missing, `figma-sync` will prompt you to paste it, or you can skip LLM enrichment.
 
 ## 5. Run the code → Figma bootstrap
 

@@ -9,7 +9,7 @@ async function createTempDir(): Promise<string> {
 }
 
 describe('runInitCommand', () => {
-  it('creates config and adds env placeholder when files are missing', async () => {
+  it('creates config when missing', async () => {
     const dir = await createTempDir();
 
     await runInitCommand(dir);
@@ -19,55 +19,77 @@ describe('runInitCommand', () => {
     const config = JSON.parse(configRaw);
 
     expect(config.projectName).toBe('My Next.js App');
-    expect(config.paths.uiComponentsGlob).toBe('src/components/ui/**/*');
-
-    const envExamplePath = path.join(dir, '.env.example');
-    const envExample = await fs.readFile(envExamplePath, 'utf8');
-    expect(envExample).toContain('FIGMA_SYNC_OPENAI_API_KEY=');
-
-    const envPath = path.join(dir, '.env');
-    let envExists = true;
-    try {
-      await fs.access(envPath);
-    } catch {
-      envExists = false;
-    }
-    expect(envExists).toBe(false);
+    // Since temp dir is empty, it should fall back to defaults
+    expect(config.paths.uiComponentsGlob).toBeDefined();
+    expect(config.paths.screenComponentsGlob).toBeDefined();
+    expect(config.paths.cssVariablesFiles).toBeInstanceOf(Array);
+    expect(config.paths.tailwindConfig).toBeDefined();
   });
 
-  it('is idempotent when config and env example already exist', async () => {
+  it('is idempotent when config already exists', async () => {
     const dir = await createTempDir();
 
     await runInitCommand(dir);
     const configPath = path.join(dir, 'figma-sync.config.json');
-    const envExamplePath = path.join(dir, '.env.example');
 
     const firstConfig = await fs.readFile(configPath, 'utf8');
-    const firstEnvExample = await fs.readFile(envExamplePath, 'utf8');
 
     await runInitCommand(dir);
 
     const secondConfig = await fs.readFile(configPath, 'utf8');
-    const secondEnvExample = await fs.readFile(envExamplePath, 'utf8');
 
     expect(secondConfig).toBe(firstConfig);
-    // Placeholder should not be duplicated.
-    const occurrences = secondEnvExample.split('FIGMA_SYNC_OPENAI_API_KEY').length - 1;
-    expect(occurrences).toBe(1);
   });
 
-  it('does not modify .env.example when .env already exists', async () => {
+  it('does not create or modify .env files in target repo', async () => {
     const dir = await createTempDir();
-    const envPath = path.join(dir, '.env');
-    const envExamplePath = path.join(dir, '.env.example');
-
-    await fs.writeFile(envPath, 'EXISTING=1\n', 'utf8');
-    await fs.writeFile(envExamplePath, 'MY_VAR=value\n', 'utf8');
 
     await runInitCommand(dir);
 
-    const envExampleAfter = await fs.readFile(envExamplePath, 'utf8');
-    expect(envExampleAfter).toBe('MY_VAR=value\n');
+    const envPath = path.join(dir, '.env');
+    const envExamplePath = path.join(dir, '.env.example');
+
+    let envExists = false;
+    let envExampleExists = false;
+
+    try {
+      await fs.access(envPath);
+      envExists = true;
+    } catch {
+      // Expected
+    }
+
+    try {
+      await fs.access(envExamplePath);
+      envExampleExists = true;
+    } catch {
+      // Expected
+    }
+
+    expect(envExists).toBe(false);
+    expect(envExampleExists).toBe(false);
+  });
+
+  it('discovers actual project structure when directories exist', async () => {
+    const dir = await createTempDir();
+
+    // Create a realistic project structure
+    await fs.mkdir(path.join(dir, 'components', 'ui'), { recursive: true });
+    await fs.mkdir(path.join(dir, 'app'), { recursive: true });
+    await fs.writeFile(path.join(dir, 'app', 'globals.css'), ':root { --primary: #000; }');
+    await fs.writeFile(path.join(dir, 'tailwind.config.js'), 'module.exports = {}');
+
+    await runInitCommand(dir);
+
+    const configPath = path.join(dir, 'figma-sync.config.json');
+    const configRaw = await fs.readFile(configPath, 'utf8');
+    const config = JSON.parse(configRaw);
+
+    // Should discover the actual paths
+    expect(config.paths.uiComponentsGlob).toBe('components/ui/**/*');
+    expect(config.paths.screenComponentsGlob).toBe('app/**/page.tsx');
+    expect(config.paths.cssVariablesFiles).toContain('app/globals.css');
+    expect(config.paths.tailwindConfig).toBe('tailwind.config.js');
   });
 });
 

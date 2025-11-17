@@ -10,6 +10,7 @@ import {
 import { runGeneratePatches, type GeneratePatchesDeps } from './generatePatches';
 import { loadConfigFromFile } from '../config/loadConfig';
 import { runInitCommand } from './init';
+import { ensureOpenAiApiKey } from '../utils/ensureApiKey';
 
 function createInterface(): readline.Interface {
   return readline.createInterface({
@@ -46,15 +47,19 @@ export async function runWizardCommand(
   // eslint-disable-next-line no-console
   console.log('');
   // eslint-disable-next-line no-console
-  console.log('figma-sync first-run wizard');
+  console.log('┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓');
   // eslint-disable-next-line no-console
-  console.log('--------------------------------');
+  console.log('┃  figma-sync first-run wizard                              ┃');
+  // eslint-disable-next-line no-console
+  console.log('┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛');
   // eslint-disable-next-line no-console
   console.log(`Project folder: ${absRoot}`);
   // eslint-disable-next-line no-console
-  console.log('This wizard will help you run figma-sync against this project for the first time.');
+  console.log(
+    'This will guide you through the full code ⇄ Figma ⇄ code loop for this project.',
+  );
   // eslint-disable-next-line no-console
-  console.log('It will create or reuse figma-sync.config.json and walk you through the steps.');
+  console.log('Tip: Press Ctrl+C at any time to abort and exit the wizard.');
 
   // Ensure config exists (or create a starter one).
   try {
@@ -82,12 +87,20 @@ export async function runWizardCommand(
   console.log('When you are ready to continue, press Enter here.');
   await ask(rl, '> ');
 
+  // Load config and ensure API key is available
+  const config = await loadConfigFromFile(absConfigPath);
+  await ensureOpenAiApiKey(config.llm.provider);
+
   // 1) Scan + generate-spec
   // eslint-disable-next-line no-console
   console.log('');
   // eslint-disable-next-line no-console
   console.log('Step 1/4: Analyze your code and generate artifacts ...');
+  // eslint-disable-next-line no-console
+  console.log('  - Running scan (reads your code and builds a CodeModel)...');
   await runScanWithNodeEnv(absConfigPath, absRoot);
+  // eslint-disable-next-line no-console
+  console.log('  - Running generate-spec (builds DesignSpec and Figma instructions)...');
   await runGenerateSpecWithNodeEnv(absConfigPath, absRoot);
   // eslint-disable-next-line no-console
   console.log('- Done. Created artifacts/ with JSON files describing your code and Figma instructions.');
@@ -99,6 +112,8 @@ export async function runWizardCommand(
   console.log('Step 2/4: Start the local figma-sync server ...');
   // eslint-disable-next-line no-console
   console.log('The server will listen on http://localhost:7001 by default.');
+  // eslint-disable-next-line no-console
+  console.log('Tip: You can stop the server at any time with Ctrl+C in this terminal.');
   await runServeWithNodeEnv(absConfigPath, absRoot);
   // eslint-disable-next-line no-console
   console.log('- Server started. Leave this process running while you use the Figma plugin.');
@@ -158,7 +173,11 @@ export async function runWizardCommand(
     cwd: absRoot,
   };
 
+  // eslint-disable-next-line no-console
+  console.log('  - Generating code patches from Figma changes...');
   await runGeneratePatches(absConfigPath, deps);
+  // eslint-disable-next-line no-console
+  console.log('  - Applying patches to your code...');
   await runApplyPatchesWithNodeEnv(absConfigPath, absRoot);
 
   // eslint-disable-next-line no-console

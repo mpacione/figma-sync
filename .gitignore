@@ -14,4 +14,5 @@ coverage/
 artifacts/
 packages/*/dist/
 packages/*/build/
+figma-sync.config.json
 

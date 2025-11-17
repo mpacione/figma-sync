@@ -84,3 +84,82 @@ describe('runScan', () => {
   });
 });
 
+  it('skips missing CSS variables files (ENOENT) but still builds a CodeModel', async () => {
+    const config: FigmaSyncConfig = {
+      projectName: 'Test Project',
+      paths: {
+        uiComponentsGlob: 'src/components/ui/**/*',
+        screenComponentsGlob: 'app/**/page.tsx',
+        cssVariablesFiles: ['src/styles/tokens.css'],
+        tailwindConfig: 'tailwind.config.ts',
+      },
+      figma: {
+        fileKey: 'FILE_KEY',
+        pages: {
+          primitives: 'System/Primitives',
+          patterns: 'System/Patterns',
+          screens: 'App/Screens',
+        },
+      },
+      llm: {
+        provider: 'openai',
+        model: 'gpt-4',
+        temperature: 0.2,
+        maxTokens: 1024,
+      },
+      heuristics: {
+        primitiveComponentPatterns: ['Button'],
+        excludeComponents: [],
+      },
+    };
+
+    const files: Record<string, string> = {
+      '/repo/src/components/ui/Button.tsx':
+        'export function Button() { return <button className="px-2" />; }',
+      '/repo/app/login/page.tsx':
+        'export default function Page() { return <Button><Icon /></Button>; }',
+    };
+
+    const written: Record<string, string> = {};
+
+    const deps: ScanDeps = {
+      loadConfigFromFile: async () => config,
+      readFile: async (filePath) => {
+        const content = files[filePath];
+        if (!content) {
+          const err = new Error(
+            `ENOENT: no such file or directory, open '${filePath}'`,
+          ) as NodeJS.ErrnoException;
+          err.code = 'ENOENT';
+          throw err;
+        }
+        return content;
+      },
+      writeFile: async (filePath, content) => {
+        written[filePath] = content;
+      },
+      ensureDir: async () => {
+        // no-op
+      },
+      glob: async (pattern, cwd) => {
+        expect(cwd).toBe('/repo');
+        if (pattern === 'src/components/ui/**/*') {
+          return ['/repo/src/components/ui/Button.tsx'];
+        }
+        if (pattern === 'app/**/page.tsx') {
+          return ['/repo/app/login/page.tsx'];
+        }
+        return [];
+      },
+      cwd: '/repo',
+    };
+
+    await runScan('figma-sync.config.json', deps);
+
+    const outPath = '/repo/artifacts/code-model.json';
+    expect(written[outPath]).toBeDefined();
+    const model = JSON.parse(written[outPath]!);
+    expect(model.components.map((c: any) => c.name)).toEqual(['Button']);
+  });
+
+
