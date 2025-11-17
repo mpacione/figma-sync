@@ -46,8 +46,13 @@ async function runPluginWithEnv(setup: (ctx: any) => void) {
         x: 0,
         y: 0,
         children: [] as any[],
+        fills: [],
         appendChild(child: any) {
           this.children.push(child);
+        },
+        resize(width: number, height: number) {
+          this.width = width;
+          this.height = height;
         },
         _data: {} as Record<string, string>,
         setPluginData(key: string, value: string) {
@@ -62,7 +67,23 @@ async function runPluginWithEnv(setup: (ctx: any) => void) {
     createComponent: vi.fn(() => {
       const component: any = {
         name: '',
+        x: 0,
+        y: 0,
         children: [] as any[],
+        fills: [],
+        strokes: [],
+        strokeWeight: 0,
+        cornerRadius: 0,
+        layoutMode: 'NONE',
+        primaryAxisSizingMode: 'FIXED',
+        counterAxisSizingMode: 'FIXED',
+        primaryAxisAlignItems: 'MIN',
+        counterAxisAlignItems: 'MIN',
+        itemSpacing: 0,
+        paddingLeft: 0,
+        paddingRight: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
         appendChild(child: any) {
           this.children.push(child);
         },
@@ -84,10 +105,13 @@ async function runPluginWithEnv(setup: (ctx: any) => void) {
       const text: any = {
         characters: '',
         fontSize: 14,
+        fills: [],
         x: 0,
         y: 0,
         width: 50,
         height: 20,
+        layoutAlign: 'INHERIT',
+        layoutGrow: 0,
       };
       return text;
     }),

@@ -92,6 +92,12 @@ export const zChildrenStructureNode: z.ZodType<ChildrenStructureNode> = z.lazy(
     }),
 );
 
+export const zTailwindClassesStructured = z.object({
+  base: z.array(z.string()),
+  variants: z.record(z.string(), z.record(z.string(), z.array(z.string()))),
+}).optional();
+export type TailwindClassesStructured = z.infer<typeof zTailwindClassesStructured>;
+
 export const zCodeComponent = z.object({
   name: z.string(),
   sourceFile: z.string(),
@@ -100,6 +106,7 @@ export const zCodeComponent = z.object({
   props: z.array(zCodeComponentProp),
   usageExamples: z.array(zCodeComponentUsageExample),
   tailwindClasses: z.array(z.string()),
+  tailwindClassesStructured: zTailwindClassesStructured,
   childrenStructure: z.array(zChildrenStructureNode).optional(),
 });
 export type CodeComponent = z.infer<typeof zCodeComponent>;

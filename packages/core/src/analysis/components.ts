@@ -79,6 +79,87 @@ function extractTailwindClasses(source: string): string[] {
   return Array.from(classes);
 }
 
+/**
+ * Parse cva() function calls to extract structured Tailwind classes
+ */
+function extractCvaClasses(sourceFile: ts.SourceFile): {
+  base: string[];
+  variants: Record<string, Record<string, string[]>>;
+} | undefined {
+  let result: { base: string[]; variants: Record<string, Record<string, string[]>> } | undefined;
+
+  function visit(node: ts.Node) {
+    // Look for cva() call expressions
+    if (ts.isCallExpression(node)) {
+      const expression = node.expression;
+      if (ts.isIdentifier(expression) && expression.text === 'cva') {
+        // cva(baseClasses, { variants: {...} })
+        const args = node.arguments;
+        if (args.length >= 1) {
+          const base: string[] = [];
+          const variants: Record<string, Record<string, string[]>> = {};
+
+          // First argument: base classes (string literal)
+          const baseArg = args[0];
+          if (ts.isStringLiteral(baseArg)) {
+            const baseClasses = baseArg.text.split(/\s+/).filter(Boolean);
+            base.push(...baseClasses);
+          }
+
+          // Second argument: config object with variants
+          if (args.length >= 2 && ts.isObjectLiteralExpression(args[1])) {
+            const configObj = args[1];
+            for (const prop of configObj.properties) {
+              if (
+                ts.isPropertyAssignment(prop) &&
+                ts.isIdentifier(prop.name) &&
+                prop.name.text === 'variants' &&
+                ts.isObjectLiteralExpression(prop.initializer)
+              ) {
+                // variants: { variant: {...}, size: {...} }
+                const variantsObj = prop.initializer;
+                for (const variantProp of variantsObj.properties) {
+                  if (
+                    ts.isPropertyAssignment(variantProp) &&
+                    ts.isIdentifier(variantProp.name) &&
+                    ts.isObjectLiteralExpression(variantProp.initializer)
+                  ) {
+                    const variantName = variantProp.name.text;
+                    variants[variantName] = {};
+
+                    // variant: { default: '...', destructive: '...' }
+                    const variantValuesObj = variantProp.initializer;
+                    for (const valueProp of variantValuesObj.properties) {
+                      if (ts.isPropertyAssignment(valueProp) && ts.isStringLiteral(valueProp.initializer)) {
+                        const valueName = ts.isIdentifier(valueProp.name)
+                          ? valueProp.name.text
+                          : ts.isStringLiteral(valueProp.name)
+                            ? valueProp.name.text
+                            : '';
+                        if (valueName) {
+                          const classes = valueProp.initializer.text.split(/\s+/).filter(Boolean);
+                          variants[variantName][valueName] = classes;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          result = { base, variants };
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return result;
+}
+
 export function extractComponentsFromSource(
   source: string,
   filePath: string,
@@ -94,6 +175,7 @@ export function extractComponentsFromSource(
 
   const names = extractExportedComponentNames(tsSourceFile);
   const tailwindClasses = extractTailwindClasses(source);
+  const cvaClasses = extractCvaClasses(tsSourceFile);
 
   return names.map<CodeComponent>((name) => ({
     name,
@@ -103,6 +185,7 @@ export function extractComponentsFromSource(
     props: [],
     usageExamples: [],
     tailwindClasses,
+    tailwindClassesStructured: cvaClasses,
     childrenStructure: undefined,
   }));
 }

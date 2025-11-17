@@ -141,8 +141,40 @@ async function applyInstructions(instructions: FigmaInstructionSet): Promise<voi
         }
         const frame = figma.createFrame();
         frame.name = op.name;
-        frame.x = 0;
-        frame.y = 0;
+
+        // Set dimensions
+        const width = op.width || 1440;
+        const height = op.height || 900;
+        frame.resize(width, height);
+
+        // Set position
+        frame.x = op.x || 0;
+        frame.y = op.y || 0;
+
+        // Set background
+        frame.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1 } }];
+
+        // Add placeholder content if we have description
+        if (fontLoaded && (op.description || op.componentCount)) {
+          const text = figma.createText();
+          text.name = 'Screen Info';
+          text.fontSize = 16;
+          text.fills = [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 } }];
+
+          let content = `Screen: ${op.name}\n`;
+          if (op.description) {
+            content += `${op.description}\n`;
+          }
+          if (op.componentCount !== undefined) {
+            content += `Components used: ${op.componentCount}`;
+          }
+
+          text.characters = content;
+          text.x = 40;
+          text.y = 40;
+          frame.appendChild(text);
+        }
+
         page.appendChild(frame);
         if (frame.setPluginData) {
           frame.setPluginData(PLUGIN_KEY_SCREEN_ID, op.screenId);
@@ -164,73 +196,94 @@ async function applyInstructions(instructions: FigmaInstructionSet): Promise<voi
 
         // Get visual properties from the operation
         const visualProps = op.visualProperties || {};
-        const padding = {
-          left: visualProps.paddingLeft || 16,
-          right: visualProps.paddingRight || 16,
-          top: visualProps.paddingTop || 8,
-          bottom: visualProps.paddingBottom || 8,
-        };
-        const minWidth = visualProps.minWidth || 100;
-        const minHeight = visualProps.minHeight || 40;
 
-        // Create a background rectangle with visual properties
-        const background = figma.createRectangle();
-        background.name = 'Background';
-
-        // Apply fills
+        // Apply fills (background)
         if (visualProps.fills && visualProps.fills.length > 0) {
-          background.fills = visualProps.fills;
+          component.fills = visualProps.fills;
         } else {
           // Default fill
-          background.fills = [{ type: 'SOLID', color: { r: 0.95, g: 0.95, b: 0.95 } }];
+          component.fills = [{ type: 'SOLID', color: { r: 0.95, g: 0.95, b: 0.95 } }];
         }
 
-        // Apply strokes
+        // Apply strokes (border)
         if (visualProps.strokes && visualProps.strokes.length > 0) {
-          background.strokes = visualProps.strokes;
-          background.strokeWeight = visualProps.strokeWeight || 1;
+          component.strokes = visualProps.strokes;
+          component.strokeWeight = visualProps.strokeWeight || 1;
         }
 
         // Apply corner radius
         if (visualProps.cornerRadius !== undefined) {
-          background.cornerRadius = visualProps.cornerRadius;
+          component.cornerRadius = visualProps.cornerRadius;
         }
 
-        component.appendChild(background);
+        // Apply auto-layout properties
+        const layoutMode = visualProps.layoutMode || 'HORIZONTAL';
+        component.layoutMode = layoutMode;
+
+        if (layoutMode !== 'NONE') {
+          // Set sizing modes
+          component.primaryAxisSizingMode = visualProps.primaryAxisSizingMode || 'AUTO';
+          component.counterAxisSizingMode = visualProps.counterAxisSizingMode || 'AUTO';
+
+          // Set alignment
+          component.primaryAxisAlignItems = visualProps.primaryAxisAlignItems || 'CENTER';
+          component.counterAxisAlignItems = visualProps.counterAxisAlignItems || 'CENTER';
+
+          // Set spacing
+          component.itemSpacing = visualProps.itemSpacing || 8;
+
+          // Set padding
+          component.paddingLeft = visualProps.paddingLeft || 16;
+          component.paddingRight = visualProps.paddingRight || 16;
+          component.paddingTop = visualProps.paddingTop || 8;
+          component.paddingBottom = visualProps.paddingBottom || 8;
+        }
 
         // Add text label with the component name
         if (fontLoaded) {
           const text = figma.createText();
           text.name = 'Label';
           text.characters = op.name.split('/')[0]; // Use just the component name, not the variant path
-          text.fontSize = 14;
-          text.x = padding.left;
-          text.y = padding.top;
 
-          // Set text color based on background (simple heuristic)
-          const bgFill = visualProps.fills && visualProps.fills[0];
-          if (bgFill && bgFill.color) {
-            const brightness = (bgFill.color.r + bgFill.color.g + bgFill.color.b) / 3;
-            const textColor = brightness > 0.5 ? { r: 0, g: 0, b: 0 } : { r: 1, g: 1, b: 1 };
-            text.fills = [{ type: 'SOLID', color: textColor }];
+          // Apply text properties
+          const textProps = visualProps.textProperties || {};
+          text.fontSize = textProps.fontSize || 14;
+
+          // Set text color
+          if (textProps.textColor) {
+            text.fills = [{ type: 'SOLID', color: textProps.textColor }];
+          } else {
+            // Fallback: determine color based on background
+            const bgFill = visualProps.fills && visualProps.fills[0];
+            if (bgFill && bgFill.color) {
+              const brightness = (bgFill.color.r + bgFill.color.g + bgFill.color.b) / 3;
+              const textColor = brightness > 0.5 ? { r: 0, g: 0, b: 0 } : { r: 1, g: 1, b: 1 };
+              text.fills = [{ type: 'SOLID', color: textColor }];
+            }
           }
 
           component.appendChild(text);
 
-          // Calculate component size based on text and padding
-          const componentWidth = Math.max(minWidth, text.width + padding.left + padding.right);
-          const componentHeight = Math.max(minHeight, text.height + padding.top + padding.bottom);
-
-          // Resize background and component
-          background.resize(componentWidth, componentHeight);
-          component.resize(componentWidth, componentHeight);
+          // Set layout constraints for text (hug contents)
+          if (layoutMode !== 'NONE') {
+            text.layoutAlign = 'INHERIT';
+            text.layoutGrow = 0; // Don't stretch, hug contents
+          }
         } else {
-          // If fonts aren't loaded, just use min size
-          background.resize(minWidth, minHeight);
+          // If fonts aren't loaded, set a minimum size
+          const minWidth = visualProps.minWidth || 100;
+          const minHeight = visualProps.minHeight || 40;
           component.resize(minWidth, minHeight);
         }
 
         page.appendChild(component);
+
+        // Apply position if provided
+        if (op.x !== undefined && op.y !== undefined) {
+          component.x = op.x;
+          component.y = op.y;
+        }
+
         if (component.setPluginData) {
           component.setPluginData(
             PLUGIN_KEY_DESIGN_COMPONENT_ID,
@@ -276,6 +329,13 @@ async function applyInstructions(instructions: FigmaInstructionSet): Promise<voi
         }
 
         const componentSet = figma.combineAsVariants(componentNodes, parent);
+
+        // Apply position if provided
+        if (op.x !== undefined && op.y !== undefined) {
+          componentSet.x = op.x;
+          componentSet.y = op.y;
+        }
+
         nodeRefs.set(op.componentSetId, componentSet);
         break;
       }

@@ -43,6 +43,7 @@ const codeModel: CodeModel = {
       props: [],
       usageExamples: [],
       tailwindClasses: ['px-2'],
+      tailwindClassesStructured: undefined,
       childrenStructure: undefined,
     },
   ],
@@ -88,7 +89,7 @@ const config: FigmaSyncConfig = {
 describe('buildFigmaInstructionSet', () => {
   it('creates a set of operations to materialize the DesignSpec in Figma', () => {
     const designSpec = buildDesignSpec(codeModel, config);
-    const instructions = buildFigmaInstructionSet(designSpec);
+    const instructions = buildFigmaInstructionSet(designSpec, codeModel);
 
     // Validate against schema
     const parsed = zFigmaInstructionSet.parse(instructions);
@@ -134,7 +135,7 @@ describe('buildFigmaInstructionSet', () => {
     };
 
     const designSpec = buildDesignSpec(codeModel, weirdConfig);
-    const instructions = buildFigmaInstructionSet(designSpec);
+    const instructions = buildFigmaInstructionSet(designSpec, codeModel);
 
     const createPageOps = instructions.operations.filter(
       (op) => op.type === 'CreatePage',
@@ -174,7 +175,7 @@ describe('buildFigmaInstructionSet', () => {
       },
     };
 
-    const instructions = buildFigmaInstructionSet(specWithoutScreensPage);
+    const instructions = buildFigmaInstructionSet(specWithoutScreensPage, codeModel);
     const screenFrameOps = instructions.operations.filter(
       (op) => op.type === 'CreateScreenFrame',
     );

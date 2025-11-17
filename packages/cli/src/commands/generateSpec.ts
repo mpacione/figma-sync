@@ -151,7 +151,7 @@ export async function runGenerateSpec(
   const designSpecPath = path.join(artifactsDir, 'design-spec.json');
   await deps.writeFile(designSpecPath, JSON.stringify(finalSpec, null, 2));
 
-  const instructions = buildFigmaInstructionSet(finalSpec);
+  const instructions = buildFigmaInstructionSet(finalSpec, codeModel);
   const instructionsPath = path.join(artifactsDir, 'figma-instructions.json');
   await deps.writeFile(instructionsPath, JSON.stringify(instructions, null, 2));
 }

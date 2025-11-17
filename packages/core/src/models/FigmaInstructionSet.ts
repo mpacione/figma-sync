@@ -69,6 +69,13 @@ const zFigmaPaint = z.object({
   opacity: z.number().min(0).max(1).optional(),
 });
 
+const zTextProperties = z.object({
+  fontFamily: z.string().optional(),
+  fontWeight: z.number().optional(),
+  fontSize: z.number().optional(),
+  textColor: zFigmaColor.optional(),
+}).optional();
+
 const zVisualProperties = z.object({
   fills: z.array(zFigmaPaint).optional(),
   strokes: z.array(zFigmaPaint).optional(),
@@ -80,6 +87,15 @@ const zVisualProperties = z.object({
   paddingBottom: z.number().optional(),
   minWidth: z.number().optional(),
   minHeight: z.number().optional(),
+  // Auto-layout properties
+  layoutMode: z.enum(['NONE', 'HORIZONTAL', 'VERTICAL']).optional(),
+  primaryAxisSizingMode: z.enum(['FIXED', 'AUTO']).optional(),
+  counterAxisSizingMode: z.enum(['FIXED', 'AUTO']).optional(),
+  primaryAxisAlignItems: z.enum(['MIN', 'CENTER', 'MAX', 'SPACE_BETWEEN']).optional(),
+  counterAxisAlignItems: z.enum(['MIN', 'CENTER', 'MAX', 'BASELINE']).optional(),
+  itemSpacing: z.number().optional(),
+  // Text properties
+  textProperties: zTextProperties,
 }).optional();
 
 const zCreateComponentOp = zBaseOperation.extend({
@@ -89,12 +105,16 @@ const zCreateComponentOp = zBaseOperation.extend({
   pageId: z.string(),
   name: z.string(),
   visualProperties: zVisualProperties,
+  x: z.number().optional(),
+  y: z.number().optional(),
 });
 
 const zCreateComponentSetOp = zBaseOperation.extend({
   type: z.literal('CreateComponentSet'),
   componentSetId: z.string(),
   componentIds: z.array(z.string()),
+  x: z.number().optional(),
+  y: z.number().optional(),
 });
 
 const zCreateVariantOp = zBaseOperation.extend({
@@ -117,6 +137,12 @@ const zCreateScreenFrameOp = zBaseOperation.extend({
   pageId: z.string(),
   screenId: z.string(),
   name: z.string(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+  x: z.number().optional(),
+  y: z.number().optional(),
+  description: z.string().optional(),
+  componentCount: z.number().optional(),
 });
 
 const zApplyVariablesToLayersOp = zBaseOperation.extend({

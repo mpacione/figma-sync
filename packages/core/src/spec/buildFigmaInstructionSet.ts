@@ -1,5 +1,7 @@
 import type { DesignSpec, DesignComponentSpec } from '../models/DesignSpec';
+import type { CodeModel } from '../models/CodeModel';
 import { FigmaInstructionSet, FigmaOperation } from '../models/FigmaInstructionSet';
+import { mapTailwindToFigma } from '../tailwind/mapper';
 
 function slugifyName(name: string): string {
   const slug = name
@@ -31,24 +33,48 @@ function generateVisualProperties(
   component: DesignComponentSpec,
   variantProps: Record<string, string | boolean>,
   spec: DesignSpec,
+  codeModel: CodeModel,
 ): any {
-  const visualProps: any = {
-    fills: [],
-    strokes: [],
-    cornerRadius: 6, // Default
-    paddingLeft: 16,
-    paddingRight: 16,
-    paddingTop: 8,
-    paddingBottom: 8,
-    minWidth: 100,
-    minHeight: 40,
+  // Find the corresponding CodeComponent to get Tailwind classes
+  const codeComponent = codeModel.components.find(
+    (c) => c.name === component.sourceComponentName
+  );
+
+  // Combine Tailwind classes: base + variant-specific + size-specific
+  const tailwindClasses: string[] = [];
+
+  if (codeComponent?.tailwindClassesStructured) {
+    const structured = codeComponent.tailwindClassesStructured;
+
+    // Add base classes
+    tailwindClasses.push(...structured.base);
+
+    // Add variant-specific classes
+    Object.entries(variantProps).forEach(([propName, propValue]) => {
+      const variantClasses = structured.variants[propName]?.[String(propValue)];
+      if (variantClasses) {
+        tailwindClasses.push(...variantClasses);
+      }
+    });
+  }
+
+  // Map Tailwind classes to Figma properties
+  const visualProps = mapTailwindToFigma(tailwindClasses, spec);
+
+  // Initialize arrays for fills and strokes
+  visualProps.fills = visualProps.fills || [];
+  visualProps.strokes = visualProps.strokes || [];
+
+  // Initialize text properties
+  visualProps.textProperties = {
+    fontFamily: visualProps.fontFamily || 'Inter',
+    fontWeight: visualProps.fontWeight || 500,
+    fontSize: visualProps.fontSize || 14,
   };
 
-  // Get the variant value (e.g., "default", "destructive", "outline")
-  const variant = variantProps.variant as string | undefined;
-  const size = variantProps.size as string | undefined;
-
   // Map variant to colors from design tokens
+  // This handles color mapping for components that use semantic color names
+  const variant = variantProps.variant as string | undefined;
   const colorMap: Record<string, { bg: string; fg: string; border?: string }> = {
     default: { bg: '--primary', fg: '--primary-foreground' },
     destructive: { bg: '--destructive', fg: '#ffffff' },
@@ -67,7 +93,7 @@ function generateVisualProperties(
     );
   };
 
-  // Set background fill
+  // Set background fill and determine text color
   if (colors.bg !== 'transparent') {
     const bgVar = findColorVariable(colors.bg);
     if (bgVar) {
@@ -76,11 +102,24 @@ function generateVisualProperties(
         type: 'SOLID',
         color: bgColor,
       });
+
+      // Determine text color based on background brightness
+      const brightness = (bgColor.r + bgColor.g + bgColor.b) / 3;
+      visualProps.textProperties.textColor = brightness > 0.5
+        ? { r: 0, g: 0, b: 0 } // Black text on light background
+        : { r: 1, g: 1, b: 1 }; // White text on dark background
+    }
+  } else {
+    // For transparent backgrounds, use foreground color
+    const fgVar = findColorVariable(colors.fg);
+    if (fgVar) {
+      const fgColor = hexToFigmaColor(fgVar.modeValues.default as string);
+      visualProps.textProperties.textColor = fgColor;
     }
   }
 
-  // Set border stroke for outline variant
-  if (colors.border) {
+  // Set border stroke for outline variant (if not already set by Tailwind)
+  if (colors.border && visualProps.strokes.length === 0) {
     const borderVar = findColorVariable(colors.border);
     if (borderVar) {
       const borderColor = hexToFigmaColor(borderVar.modeValues.default as string);
@@ -88,50 +127,68 @@ function generateVisualProperties(
         type: 'SOLID',
         color: borderColor,
       });
-      visualProps.strokeWeight = 1;
+      if (!visualProps.strokeWeight) {
+        visualProps.strokeWeight = 1;
+      }
     }
   }
 
-  // Adjust size-based properties
-  if (size === 'sm') {
-    visualProps.paddingLeft = 12;
-    visualProps.paddingRight = 12;
-    visualProps.paddingTop = 6;
-    visualProps.paddingBottom = 6;
-    visualProps.minHeight = 32;
-  } else if (size === 'lg') {
-    visualProps.paddingLeft = 24;
-    visualProps.paddingRight = 24;
-    visualProps.paddingTop = 10;
-    visualProps.paddingBottom = 10;
-    visualProps.minHeight = 44;
-  } else if (size === 'icon') {
-    visualProps.paddingLeft = 0;
-    visualProps.paddingRight = 0;
-    visualProps.paddingTop = 0;
-    visualProps.paddingBottom = 0;
-    visualProps.minWidth = 36;
-    visualProps.minHeight = 36;
-  }
-
-  // Get corner radius from design tokens
-  const radiusVar = spec.variables.variables.find(
-    (v) => v.name === '--radius' && v.type === 'FLOAT'
-  );
-  if (radiusVar) {
-    // Convert rem to pixels (assuming 1rem = 16px)
-    visualProps.cornerRadius = (radiusVar.modeValues.default as number) * 16;
+  // Get corner radius from design tokens if not set by Tailwind
+  if (!visualProps.cornerRadius) {
+    const radiusVar = spec.variables.variables.find(
+      (v) => v.name === '--radius' && v.type === 'FLOAT'
+    );
+    if (radiusVar) {
+      // Convert rem to pixels (assuming 1rem = 16px)
+      visualProps.cornerRadius = (radiusVar.modeValues.default as number) * 16;
+    }
   }
 
   return visualProps;
 }
 
+/**
+ * Calculate grid positions for components to avoid overlaps
+ * Groups component sets together and arranges them in a grid
+ */
+function calculateGridPositions(components: any[]): Map<string, { x: number; y: number }> {
+  const positions = new Map<string, { x: number; y: number }>();
+
+  const GRID_SPACING = 100; // Space between components
+  const COMPONENT_WIDTH = 300; // Estimated component width
+  const COMPONENT_HEIGHT = 200; // Estimated component height
+  const COLUMNS = 4; // Number of columns in grid
+
+  let currentRow = 0;
+  let currentCol = 0;
+
+  components.forEach((component) => {
+    const x = currentCol * (COMPONENT_WIDTH + GRID_SPACING);
+    const y = currentRow * (COMPONENT_HEIGHT + GRID_SPACING);
+
+    positions.set(component.id, { x, y });
+
+    // Move to next position
+    currentCol++;
+    if (currentCol >= COLUMNS) {
+      currentCol = 0;
+      currentRow++;
+    }
+  });
+
+  return positions;
+}
+
 export function buildFigmaInstructionSet(
   spec: DesignSpec,
+  codeModel: CodeModel,
 ): FigmaInstructionSet {
   const operations: FigmaOperation[] = [];
   let opCounter = 0;
   const nextOpId = () => `op-${(opCounter += 1)}`;
+
+  // Calculate grid positions for all components
+  const componentPositions = calculateGridPositions(spec.components);
 
   // Pages
   const pageNameToId = new Map<string, string>();
@@ -174,6 +231,7 @@ export function buildFigmaInstructionSet(
   // Components
   spec.components.forEach((component) => {
     const pageId = pageNameToId.get(component.placement.page);
+    const position = componentPositions.get(component.id) || { x: 0, y: 0 };
 
     // Check if component has variants
     const hasVariants = component.propsModel.variantProps.length > 0 &&
@@ -207,6 +265,7 @@ export function buildFigmaInstructionSet(
           component,
           exampleVariant.props,
           spec,
+          codeModel,
         );
 
         operations.push({
@@ -220,15 +279,17 @@ export function buildFigmaInstructionSet(
         });
       });
 
-      // Create component set to combine all variants
+      // Create component set to combine all variants with position
       operations.push({
         id: nextOpId(),
         type: 'CreateComponentSet',
         componentSetId: component.id,
         componentIds,
+        x: position.x,
+        y: position.y,
       });
     } else {
-      // Create a single component (no variants)
+      // Create a single component (no variants) with position
       // Use default props for visual properties
       const defaultProps: Record<string, string | boolean> = {};
       component.propsModel.variantProps.forEach((variantProp) => {
@@ -241,6 +302,7 @@ export function buildFigmaInstructionSet(
         component,
         defaultProps,
         spec,
+        codeModel,
       );
 
       operations.push({
@@ -251,6 +313,8 @@ export function buildFigmaInstructionSet(
         pageId: pageId ?? 'page-default',
         name: component.name,
         visualProperties,
+        x: position.x,
+        y: position.y,
       });
     }
   });
@@ -261,8 +325,25 @@ export function buildFigmaInstructionSet(
     ? pageNameToId.get(screensPageEntry.name)
     : undefined;
 
-  spec.screens.forEach((screen) => {
+  const SCREEN_WIDTH = 1440;
+  const SCREEN_HEIGHT = 900;
+  const SCREEN_SPACING = 200;
+  const SCREENS_PER_ROW = 3;
+
+  spec.screens.forEach((screen, index) => {
     if (!screensPageId) return;
+
+    // Calculate grid position for screens
+    const col = index % SCREENS_PER_ROW;
+    const row = Math.floor(index / SCREENS_PER_ROW);
+    const x = col * (SCREEN_WIDTH + SCREEN_SPACING);
+    const y = row * (SCREEN_HEIGHT + SCREEN_SPACING);
+
+    // Find the corresponding CodeScreen to get component count
+    const codeScreen = codeModel.screens.find(
+      (cs) => cs.route === screen.route
+    );
+
     operations.push({
       id: nextOpId(),
       type: 'CreateScreenFrame',
@@ -270,6 +351,12 @@ export function buildFigmaInstructionSet(
       pageId: screensPageId,
       screenId: screen.id,
       name: screen.name,
+      width: SCREEN_WIDTH,
+      height: SCREEN_HEIGHT,
+      x,
+      y,
+      description: codeScreen?.description,
+      componentCount: codeScreen?.usesComponents.length || 0,
     });
   });
 
