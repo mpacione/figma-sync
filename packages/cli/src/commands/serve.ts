@@ -74,8 +74,20 @@ async function handleRequest(
   req: ServeRequest,
   res: ServeResponse,
 ): Promise<void> {
+  // Set CORS headers to allow Figma plugin to access the server
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
   const method = (req.method || 'GET').toUpperCase();
   const pathname = getPathname(req.url ?? '/');
+
+  // Handle preflight OPTIONS requests
+  if (method === 'OPTIONS') {
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
 
   if (method === 'GET' && pathname === '/health') {
     sendJson(res, 200, { status: 'ok' });

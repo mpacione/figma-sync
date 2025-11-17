@@ -46,6 +46,26 @@ function createMockResponse() {
 }
 
 describe('createServeHandler', () => {
+  it('handles CORS preflight OPTIONS requests', async () => {
+    const deps: ServeDeps = {
+      loadConfigFromFile: async () => config,
+      readFile: async () => '',
+      writeFile: async () => {},
+      fileExists: async () => false,
+      cwd: '/repo',
+    };
+
+    const handler = await createServeHandler('figma-sync.config.json', deps);
+    const mock = createMockResponse();
+
+    await handler({ method: 'OPTIONS', url: '/figma-instructions' }, mock.res);
+
+    expect(mock.res.statusCode).toBe(204);
+    expect(mock.headers['Access-Control-Allow-Origin']).toBe('*');
+    expect(mock.headers['Access-Control-Allow-Methods']).toBe('GET, POST, OPTIONS');
+    expect(mock.headers['Access-Control-Allow-Headers']).toBe('Content-Type');
+  });
+
   it('serves health and artifact endpoints', async () => {
     const files: Record<string, string> = {
       '/repo/artifacts/code-model.json': JSON.stringify({ version: '1.0' }),
@@ -80,6 +100,8 @@ describe('createServeHandler', () => {
       await handler({ method: 'GET', url: '/health' }, mock.res);
       expect(mock.res.statusCode).toBe(200);
       expect(JSON.parse(mock.body)).toEqual({ status: 'ok' });
+      // Verify CORS headers are set
+      expect(mock.headers['Access-Control-Allow-Origin']).toBe('*');
     }
 
     // /

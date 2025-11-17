@@ -1,8 +1,4 @@
-import {
-  zFigmaInstructionSet,
-  type FigmaInstructionSet,
-  type FigmaChangeSet,
-} from 'figma-sync-core';
+import type { FigmaInstructionSet, FigmaChangeSet } from './types';
 
 // Minimal declarations so TypeScript can compile without pulling in Figma typings
 // The real Figma runtime provides these.
@@ -38,7 +34,7 @@ async function promptForServerUrl(): Promise<string> {
     if (typeof stored === 'string' && stored.trim()) {
       initialUrl = stored.trim();
     }
-  } catch {
+  } catch (_error) {
     // Ignore storage errors and use fallbackUrl
   }
 
@@ -71,14 +67,16 @@ async function promptForServerUrl(): Promise<string> {
     figma.showUI(html, { width: 340, height: 140 });
 
     figma.ui.onmessage = async (msg: any) => {
-      if (msg?.type === 'figma-sync:set-server-url' && typeof msg.url === 'string') {
+      if (msg && msg.type === 'figma-sync:set-server-url' && typeof msg.url === 'string') {
         const url = msg.url.trim() || fallbackUrl;
         try {
           await figma.clientStorage.setAsync(SERVER_URL_STORAGE_KEY, url);
-        } catch {
+        } catch (_error) {
           // Ignore storage errors
         }
-        figma.ui.close?.();
+        if (figma.ui.close) {
+          figma.ui.close();
+        }
         resolve(url);
       }
     };
@@ -95,10 +93,12 @@ async function fetchInstructionSet(
     throw new Error('Unexpected response from server');
   }
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status ?? 'error'} fetching figma-instructions`);
+    const status = res.status !== undefined && res.status !== null ? res.status : 'error';
+    throw new Error(`HTTP ${status} fetching figma-instructions`);
   }
   const data = await res.json();
-  return zFigmaInstructionSet.parse(data);
+  // Data is already validated by the CLI before being sent to the plugin
+  return data as FigmaInstructionSet;
 }
 
 // Very small executor that handles a subset of operations for now.
@@ -116,7 +116,9 @@ async function applyInstructions(instructions: FigmaInstructionSet): Promise<voi
       case 'CreateScreenFrame': {
         const page = nodeRefs.get(op.pageId);
         if (!page) {
-          figma.notify?.(`Missing page for screen frame ${op.screenId}`);
+          if (figma.notify) {
+            figma.notify(`Missing page for screen frame ${op.screenId}`);
+          }
           break;
         }
         const frame = figma.createFrame();
@@ -124,34 +126,42 @@ async function applyInstructions(instructions: FigmaInstructionSet): Promise<voi
         frame.x = 0;
         frame.y = 0;
         page.appendChild(frame);
-        frame.setPluginData?.(PLUGIN_KEY_SCREEN_ID, op.screenId);
-        frame.setPluginData?.(PLUGIN_KEY_ORIGINAL_NAME, op.name);
+        if (frame.setPluginData) {
+          frame.setPluginData(PLUGIN_KEY_SCREEN_ID, op.screenId);
+          frame.setPluginData(PLUGIN_KEY_ORIGINAL_NAME, op.name);
+        }
         nodeRefs.set(op.frameId, frame);
         break;
       }
       case 'CreateComponent': {
         const page = nodeRefs.get(op.pageId);
         if (!page) {
-          figma.notify?.(`Missing page for component ${op.name}`);
+          if (figma.notify) {
+            figma.notify(`Missing page for component ${op.name}`);
+          }
           break;
         }
         const component = figma.createComponent();
         component.name = op.name;
         page.appendChild(component);
-        component.setPluginData?.(
-          PLUGIN_KEY_DESIGN_COMPONENT_ID,
-          op.designComponentId,
-        );
-        component.setPluginData?.(PLUGIN_KEY_ORIGINAL_NAME, op.name);
+        if (component.setPluginData) {
+          component.setPluginData(
+            PLUGIN_KEY_DESIGN_COMPONENT_ID,
+            op.designComponentId,
+          );
+          component.setPluginData(PLUGIN_KEY_ORIGINAL_NAME, op.name);
+        }
         nodeRefs.set(op.componentId, component);
         break;
       }
       case 'CreateVariableCollection': {
         const variablesApi = figma.variables;
         if (!variablesApi || typeof variablesApi.createVariableCollection !== 'function') {
-          figma.notify?.(
-            'Variables API not available in this Figma environment',
-          );
+          if (figma.notify) {
+            figma.notify(
+              'Variables API not available in this Figma environment',
+            );
+          }
           break;
         }
         const collection = variablesApi.createVariableCollection(op.name);
@@ -161,13 +171,17 @@ async function applyInstructions(instructions: FigmaInstructionSet): Promise<voi
       case 'CreateVariable': {
         const variablesApi = figma.variables;
         if (!variablesApi || typeof variablesApi.createVariable !== 'function') {
-          figma.notify?.('Variables API not available in this Figma environment');
+          if (figma.notify) {
+            figma.notify('Variables API not available in this Figma environment');
+          }
           break;
         }
 
         const collection = nodeRefs.get(op.collectionId);
         if (!collection) {
-          figma.notify?.(`Missing variable collection for variable ${op.name}`);
+          if (figma.notify) {
+            figma.notify(`Missing variable collection for variable ${op.name}`);
+          }
           break;
         }
 
@@ -211,10 +225,12 @@ async function applyInstructions(instructions: FigmaInstructionSet): Promise<voi
           // Persist the original "default" value in plugin data so we can
           // detect changes later when exporting a FigmaChangeSet.
           const originalValueString = String(defaultValue);
-          variable.setPluginData?.(
-            PLUGIN_KEY_ORIGINAL_VARIABLE_VALUE,
-            originalValueString,
-          );
+          if (variable.setPluginData) {
+            variable.setPluginData(
+              PLUGIN_KEY_ORIGINAL_VARIABLE_VALUE,
+              originalValueString,
+            );
+          }
         }
 
         nodeRefs.set(op.variableId, variable);
@@ -224,7 +240,9 @@ async function applyInstructions(instructions: FigmaInstructionSet): Promise<voi
         const node = nodeRefs.get(op.nodeId);
         const newParent = nodeRefs.get(op.newParentId);
         if (!node || !newParent) {
-          figma.notify?.('Missing node or parent for ReparentNode operation');
+          if (figma.notify) {
+            figma.notify('Missing node or parent for ReparentNode operation');
+          }
           break;
         }
         newParent.appendChild(node);
@@ -233,7 +251,9 @@ async function applyInstructions(instructions: FigmaInstructionSet): Promise<voi
       case 'RenameNode': {
         const node = nodeRefs.get(op.nodeId);
         if (!node) {
-          figma.notify?.('Missing node for RenameNode operation');
+          if (figma.notify) {
+            figma.notify('Missing node for RenameNode operation');
+          }
           break;
         }
         node.name = op.name;
@@ -294,7 +314,7 @@ function collectFigmaChanges(): FigmaChangeSet {
   };
 
   // Walk pages and frames to detect renames.
-  if (figma?.root?.children) {
+  if (figma && figma.root && figma.root.children) {
     for (const page of figma.root.children) {
       visit(page);
     }
@@ -380,7 +400,8 @@ async function postChangeSet(
     throw new Error('Unexpected response from server when posting changes');
   }
   if (!res.ok) {
-    throw new Error(`HTTP ${res.status ?? 'error'} posting figma-changes`);
+    const status = res.status !== undefined && res.status !== null ? res.status : 'error';
+    throw new Error(`HTTP ${status} posting figma-changes`);
   }
 }
 
@@ -394,24 +415,36 @@ async function main(): Promise<void> {
       const baseUrl = await promptForServerUrl();
       const instructions = await fetchInstructionSet(baseUrl);
       await applyInstructions(instructions);
-      figma.notify?.('figma-sync: applied instructions from local server');
+      if (figma.notify) {
+        figma.notify('figma-sync: applied instructions from local server');
+      }
     } else if (command === 'export-changes' || command === 'emit-changes') {
       const changeSet = collectFigmaChanges();
       if (changeSet.changes.length === 0) {
-        figma.notify?.('figma-sync: no changes detected');
+        if (figma.notify) {
+          figma.notify('figma-sync: no changes detected');
+        }
       } else {
         const baseUrl = await promptForServerUrl();
         await postChangeSet(changeSet, baseUrl);
-        figma.notify?.('figma-sync: emitted changes to local server');
+        if (figma.notify) {
+          figma.notify('figma-sync: emitted changes to local server');
+        }
       }
     } else {
-      figma.notify?.(`figma-sync: unknown command "${command}"`);
+      if (figma.notify) {
+        figma.notify(`figma-sync: unknown command "${command}"`);
+      }
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    figma.notify?.(`figma-sync error: ${message}`);
+    if (figma.notify) {
+      figma.notify(`figma-sync error: ${message}`);
+    }
   } finally {
-    figma.closePlugin?.();
+    if (figma.closePlugin) {
+      figma.closePlugin();
+    }
   }
 }
 
