@@ -24,6 +24,8 @@ In a terminal window, run this **from anywhere** (you only need to know where yo
 npx figma-sync wizard --project-root /path/to/your-next-app
 ```
 
+Note: This command assumes the figma-sync CLI is already installed or linked (see **Section 2** below). If you used `npm link` from this repo, you can also run it as `figma-sync wizard --project-root /path/to/your-next-app`.
+
 The wizard will:
 
 - Check that your app folder has a `figma-sync.config.json` file (and create a starter one if needed).
@@ -118,8 +120,21 @@ You can always come back to the detailed steps below if you want to understand o
 
 1. Install dependencies:
    - `npm install`
+
 2. Build all packages:
    - `npm run build`
+
+Optional (local dev convenience): if you are working directly from this repo and want to call figma-sync from **any** folder, you can expose the CLI globally with `npm link`:
+
+```bash
+cd packages/core
+npm link
+
+cd ../cli
+npm link
+```
+
+After that, `figma-sync --help` should work from any directory on your machine. This is only for local development; end users will typically install `figma-sync-cli` in their app repo via npm.
 
 This produces `figma-sync-cli` and `figma-sync-core` in `packages/*/dist`, and the Figma plugin bundle in `packages/plugin/dist/main.js`.
 
@@ -146,6 +161,8 @@ Options:
 
   1. In the figma-sync repo:
 
+
+
      ```bash
      cd packages/core
      npm link
@@ -161,6 +178,17 @@ Options:
      ```
 
   After that, `npx figma-sync --help` should also work from your app repo.
+
+Once you have installed or linked the CLI (Option A or B), you will run figma-sync commands *from your app repo* using the `figma-sync` binary:
+
+```bash
+figma-sync --help
+figma-sync scan --config figma-sync.config.json
+```
+
+If you prefer, `npx figma-sync ...` also works (especially when you installed `figma-sync-cli` as a dev dependency in your app repo).
+
+> Important: The `npm run cli -- ...` helper script exists **only** in this `figma-sync` monorepo. It will not work from your app repo; always use `figma-sync` / `npx figma-sync` there.
 
 ## 3. Create a figma-sync config in your app repo
 

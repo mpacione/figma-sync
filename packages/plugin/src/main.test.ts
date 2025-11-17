@@ -86,7 +86,7 @@ async function runPluginWithEnv(setup: (ctx: any) => void) {
 
   setup({ figma, fetchMock, notifications, getUiOnMessage: () => uiOnMessage });
 
-  await import('./main.js');
+  await import('./main.ts');
 
   return { figma, fetchMock, notifications, getUiOnMessage: () => uiOnMessage, closePromise };
 }

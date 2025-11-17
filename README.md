@@ -76,7 +76,9 @@ From the repo root:
 
    The `npm run cli -- ...` form is the **preferred way to run the CLI when working inside this monorepo**.
 
-4. **Run tests** (core + CLI)
+From your actual app repo (for example your Next.js + Tailwind app), do **not** run `npm run cli`. That script exists only in this figma-sync monorepo. Instead, install or link the CLI so that a `figma-sync` binary is available, and run commands like `npx figma-sync scan --config figma-sync.config.json` (or `figma-sync scan --config figma-sync.config.json` if you've linked the CLI globally). See `docs/getting-started.md` for the app-repo flow.
+
+1. **Run tests** (core + CLI)
 
    ```bash
    npm test

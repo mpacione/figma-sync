@@ -80,6 +80,7 @@ Implementation lives primarily under `packages/cli/src`:
   - Defines `createProgram` (Commander) and `runCli(argv)`.
   - Registers subcommands and options.
   - When executed as a Node entrypoint, runs `runCli(process.argv)`.
+  - In this monorepo, the CLI is usually invoked via `npm run cli -- ...`; in a user's app repo, it is invoked as `figma-sync ...` / `npx figma-sync ...` after `figma-sync-cli` is installed or linked.
 
 - `commands/*.ts`
   - `scan.ts` – builds `CodeModel` with core analysis.
