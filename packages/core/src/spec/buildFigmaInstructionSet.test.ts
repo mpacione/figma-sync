@@ -3,6 +3,7 @@ import { buildDesignSpec } from './buildDesignSpec';
 import { buildFigmaInstructionSet } from './buildFigmaInstructionSet';
 import type { CodeModel } from '../models/CodeModel';
 import type { FigmaSyncConfig } from '../config/schema';
+import type { DesignSpec } from '../models/DesignSpec';
 import { zFigmaInstructionSet } from '../models/FigmaInstructionSet';
 
 const codeModel: CodeModel = {
@@ -117,6 +118,67 @@ describe('buildFigmaInstructionSet', () => {
       (op) => op.type === 'CreateScreenFrame',
     );
     expect(createScreenFrameOps[0]?.screenId).toBe(designSpec.screens[0].id);
+  });
+
+  it('uses a fallback slug when a page name slugifies to an empty string', () => {
+    const weirdConfig: FigmaSyncConfig = {
+      ...config,
+      figma: {
+        ...config.figma,
+        pages: {
+          primitives: '   ',
+          patterns: '   ',
+          screens: '   ',
+        },
+      },
+    };
+
+    const designSpec = buildDesignSpec(codeModel, weirdConfig);
+    const instructions = buildFigmaInstructionSet(designSpec);
+
+    const createPageOps = instructions.operations.filter(
+      (op) => op.type === 'CreatePage',
+    );
+
+    expect(createPageOps[0]?.pageId).toMatch(/^page-page-0/);
+  });
+
+  it('does not create screen frames when there is no screens page', () => {
+    const specWithoutScreensPage: DesignSpec = {
+      version: '1.0',
+      projectMeta: codeModel.projectMeta,
+      variables: { collections: [], variables: [] },
+      styles: { styles: [] },
+      components: [],
+      screens: [
+        {
+          id: 'screen-0',
+          route: '/login',
+          name: 'Login',
+          componentsUsed: [],
+          layoutHints: {},
+          states: ['default'],
+        },
+      ],
+      pages: [
+        {
+          name: 'Other',
+          kind: 'other',
+          sections: undefined,
+        },
+      ],
+      mapping: {
+        codeComponentToDesignId: {},
+        codeTokenToVariableId: {},
+        routeToScreenId: { '/login': 'screen-0' },
+      },
+    };
+
+    const instructions = buildFigmaInstructionSet(specWithoutScreensPage);
+    const screenFrameOps = instructions.operations.filter(
+      (op) => op.type === 'CreateScreenFrame',
+    );
+    expect(screenFrameOps).toHaveLength(0);
   });
 });
 

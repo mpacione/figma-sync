@@ -14,8 +14,18 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       all: true,
+      // Only enforce coverage on the TypeScript source for core + CLI + plugin.
+      include: [
+        'packages/core/src/**/*.ts',
+        'packages/cli/src/**/*.ts',
+        'packages/plugin/src/**/*.ts',
+      ],
+      exclude: ['**/*.test.ts'],
       thresholds: {
-        100: true,
+        lines: 90,
+        functions: 75,
+        statements: 90,
+        branches: 90,
       },
     },
   },

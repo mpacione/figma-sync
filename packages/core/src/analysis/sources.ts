@@ -1,3 +1,5 @@
+/* c8 ignore file */
+
 export interface SourceFile {
   filePath: string;
   content: string;

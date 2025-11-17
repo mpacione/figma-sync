@@ -58,8 +58,19 @@ export function createNodeScanDeps(cwd: string): ScanDeps {
   };
 }
 
-export async function runScanWithNodeEnv(configPath: string): Promise<void> {
-  const deps = createNodeScanDeps(process.cwd());
+function resolveProjectRoot(projectRoot?: string): string {
+  if (projectRoot && projectRoot.trim().length > 0) {
+    return path.resolve(projectRoot);
+  }
+  return process.cwd();
+}
+
+export async function runScanWithNodeEnv(
+  configPath: string,
+  projectRoot?: string,
+): Promise<void> {
+  const cwd = resolveProjectRoot(projectRoot);
+  const deps = createNodeScanDeps(cwd);
   await runScan(configPath, deps);
 }
 
@@ -75,8 +86,10 @@ export function createNodeGenerateSpecDeps(cwd: string): GenerateSpecDeps {
 
 export async function runGenerateSpecWithNodeEnv(
   configPath: string,
+  projectRoot?: string,
 ): Promise<void> {
-  const deps = createNodeGenerateSpecDeps(process.cwd());
+  const cwd = resolveProjectRoot(projectRoot);
+  const deps = createNodeGenerateSpecDeps(cwd);
   await runGenerateSpec(configPath, deps);
 }
 
@@ -102,8 +115,10 @@ export function createNodeValidateDeps(cwd: string): ValidateDeps {
 
 export async function runValidateWithNodeEnv(
   configPath: string,
+  projectRoot?: string,
 ): Promise<void> {
-  const deps = createNodeValidateDeps(process.cwd());
+  const cwd = resolveProjectRoot(projectRoot);
+  const deps = createNodeValidateDeps(cwd);
   await runValidate(configPath, deps);
 }
 
@@ -128,8 +143,12 @@ export function createNodeServeDeps(cwd: string): ServeDeps {
   };
 }
 
-export async function runServeWithNodeEnv(configPath: string): Promise<void> {
-  const deps = createNodeServeDeps(process.cwd());
+export async function runServeWithNodeEnv(
+  configPath: string,
+  projectRoot?: string,
+): Promise<void> {
+  const cwd = resolveProjectRoot(projectRoot);
+  const deps = createNodeServeDeps(cwd);
   const handler = await createServeHandler(configPath, deps);
   const http = await import('node:http');
   const port = Number(process.env.FIGMA_SYNC_SERVE_PORT ?? '7001');
@@ -180,8 +199,10 @@ export function createNodeGeneratePatchesDeps(cwd: string): GeneratePatchesDeps 
 
 export async function runGeneratePatchesWithNodeEnv(
   configPath: string,
+  projectRoot?: string,
 ): Promise<void> {
-  const deps = createNodeGeneratePatchesDeps(process.cwd());
+  const cwd = resolveProjectRoot(projectRoot);
+  const deps = createNodeGeneratePatchesDeps(cwd);
   await runGeneratePatches(configPath, deps);
 }
 
@@ -208,8 +229,10 @@ export function createNodeApplyPatchesDeps(cwd: string): ApplyPatchesDeps {
 
 export async function runApplyPatchesWithNodeEnv(
   configPath: string,
+  projectRoot?: string,
 ): Promise<void> {
-  const deps = createNodeApplyPatchesDeps(process.cwd());
+  const cwd = resolveProjectRoot(projectRoot);
+  const deps = createNodeApplyPatchesDeps(cwd);
   await runApplyPatches(configPath, deps);
 }
 

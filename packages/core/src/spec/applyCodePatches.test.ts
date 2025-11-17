@@ -158,5 +158,66 @@ describe('applyCodePatchSetToFiles', () => {
     expect(change.content).toContain('border-radius: var(--radius-sm);');
   });
 
+  it('throws when hunk.before is empty', () => {
+    const patchSet: CodePatchSet = {
+      version: '1.0',
+      patches: [
+        {
+          id: 'patch-empty',
+          description: 'Invalid empty before',
+          hunks: [
+            {
+              filePath: 'src/Button.tsx',
+              before: '',
+              after: 'PrimaryButton',
+            },
+          ],
+        },
+      ],
+    };
+
+    const files = { 'src/Button.tsx': 'export const Button = () => null;\n' };
+
+    expect(() => applyCodePatchSetToFiles(patchSet, files)).toThrow(
+      /must not be empty/,
+    );
+  });
+
+  it('does not update unrelated CSS variables when token name or value does not match', () => {
+    const patchSet: CodePatchSet = {
+      version: '1.0',
+      patches: [
+        {
+          id: 'patch-unrelated',
+          description: 'Attempt to update non-matching token',
+          hunks: [
+            {
+              filePath: 'src/styles/tokens.css',
+              before: '#ffffff',
+              after: '#000000',
+              tokenName: '--primary',
+              tokenKind: 'color',
+            },
+          ],
+        },
+      ],
+    };
+
+    const original = [
+      ':root {',
+      '  --other: #ffffff;',
+      '}',
+      '',
+    ].join('\n');
+
+    const files = {
+      'src/styles/tokens.css': original,
+    };
+
+    const result = applyCodePatchSetToFiles(patchSet, files, { strict: false });
+    expect(result.changes).toEqual([]);
+    expect(files['src/styles/tokens.css']).toBe(original);
+  });
+
 });
 

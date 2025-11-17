@@ -34,37 +34,52 @@ describe('CLI program', () => {
   it('runs scan and delegates to handlers.runScan', async () => {
     const code = await run(['scan', '--config', 'figma-sync.config.json']);
     expect(code).toBe(0);
-    expect(handlers.runScan).toHaveBeenCalledWith('figma-sync.config.json');
+    expect(handlers.runScan).toHaveBeenCalledWith(
+      'figma-sync.config.json',
+      undefined,
+    );
   });
 
   it('runs generate-spec and delegates to handlers.runGenerateSpec', async () => {
     const code = await run(['generate-spec', '--config', 'figma-sync.config.json']);
     expect(code).toBe(0);
-    expect(handlers.runGenerateSpec).toHaveBeenCalledWith('figma-sync.config.json');
+    expect(handlers.runGenerateSpec).toHaveBeenCalledWith(
+      'figma-sync.config.json',
+      undefined,
+    );
   });
 
   it('runs serve and delegates to handlers.runServe', async () => {
     const code = await run(['serve', '--config', 'figma-sync.config.json']);
     expect(code).toBe(0);
-    expect(handlers.runServe).toHaveBeenCalledWith('figma-sync.config.json');
+    expect(handlers.runServe).toHaveBeenCalledWith('figma-sync.config.json', undefined);
   });
 
   it('runs generate-patches and delegates to handlers.runGeneratePatches', async () => {
     const code = await run(['generate-patches', '--config', 'figma-sync.config.json']);
     expect(code).toBe(0);
-    expect(handlers.runGeneratePatches).toHaveBeenCalledWith('figma-sync.config.json');
+    expect(handlers.runGeneratePatches).toHaveBeenCalledWith(
+      'figma-sync.config.json',
+      undefined,
+    );
   });
 
   it('runs apply-patches and delegates to handlers.runApplyPatches', async () => {
     const code = await run(['apply-patches', '--config', 'figma-sync.config.json']);
     expect(code).toBe(0);
-    expect(handlers.runApplyPatches).toHaveBeenCalledWith('figma-sync.config.json');
+    expect(handlers.runApplyPatches).toHaveBeenCalledWith(
+      'figma-sync.config.json',
+      undefined,
+    );
   });
 
   it('runs validate and delegates to handlers.runValidate', async () => {
     const code = await run(['validate', '--config', 'figma-sync.config.json']);
     expect(code).toBe(0);
-    expect(handlers.runValidate).toHaveBeenCalledWith('figma-sync.config.json');
+    expect(handlers.runValidate).toHaveBeenCalledWith(
+      'figma-sync.config.json',
+      undefined,
+    );
   });
 
   it('returns non-zero exit code on invalid command', async () => {

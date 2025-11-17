@@ -14,6 +14,27 @@ This guide walks you through running the full figma-sync v0.1 pipeline against a
 
 This is the quickest possible overview of what you need to do. Later sections explain each step in more detail.
 
+### Wizard-based first run (recommended)
+
+If you are not comfortable with terminals or remembering many commands, the easiest way to try figma-sync is to let the CLI guide you like a setup wizard.
+
+In a terminal window, run this **from anywhere** (you only need to know where your Next.js app lives on disk):
+
+```bash
+npx figma-sync wizard --project-root /path/to/your-next-app
+```
+
+The wizard will:
+
+- Check that your app folder has a `figma-sync.config.json` file (and create a starter one if needed).
+- Help you pause and edit the config to add your Figma file key and correct paths.
+- Analyze your code and generate all required `artifacts/*.json` files.
+- Start a local figma-sync server for the Figma plugin to talk to.
+- Give you simple, click-by-click instructions for what to do in the Figma desktop app.
+- Wait for you to export changes from Figma, then turn those changes into code edits and apply them.
+
+You can always come back to the detailed steps below if you want to understand or automate each individual command.
+
 1. **Prepare the figma-sync tool (this repo)**
    - Make sure you have this `figma-sync` repository on your computer.
    - Open a terminal in the `figma-sync` folder.

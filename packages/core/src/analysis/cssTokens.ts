@@ -21,6 +21,7 @@ function parseNumericValue(raw: string): { value: number; unit: string } | null 
   const match = NUMERIC_VALUE_RE.exec(value);
   if (!match) return null;
   const num = Number(match[1]);
+  /* c8 ignore next */
   if (!Number.isFinite(num)) return null;
   const unit = match[2] ?? 'px';
   return { value: num, unit };

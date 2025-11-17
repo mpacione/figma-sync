@@ -43,5 +43,40 @@ describe('zCodeModel', () => {
     };
     expect(() => zCodeModel.parse(invalid)).toThrow();
   });
+
+  it('supports components with nested childrenStructure', () => {
+    const withChildren = {
+      ...base,
+      components: [
+        {
+          name: 'Layout',
+          sourceFile: 'src/components/Layout.tsx',
+          exportedName: 'Layout',
+          kind: 'pattern' as const,
+          props: [],
+          usageExamples: [],
+          tailwindClasses: [],
+          childrenStructure: [
+            {
+              type: 'element',
+              name: 'div',
+              children: [
+                {
+                  type: 'component',
+                  name: 'Button',
+                  children: [{ type: 'text', name: 'label' }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const parsed = zCodeModel.parse(withChildren);
+    const child = parsed.components[0].childrenStructure?.[0].children?.[0]
+      .children?.[0];
+    expect(child).toMatchObject({ type: 'text', name: 'label' });
+  });
 });
 

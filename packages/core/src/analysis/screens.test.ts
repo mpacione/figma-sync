@@ -13,6 +13,10 @@ describe('inferRouteFromAppPath', () => {
   it('returns root for index route', () => {
     expect(inferRouteFromAppPath('app/page.tsx')).toBe('/');
   });
+
+  it('returns root when there is no app segment in the path', () => {
+    expect(inferRouteFromAppPath('src/pages/index.tsx')).toBe('/');
+  });
 });
 
 describe('buildScreensForAppRoutes', () => {

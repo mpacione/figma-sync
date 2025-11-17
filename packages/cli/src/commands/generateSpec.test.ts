@@ -3,6 +3,7 @@ import { runGenerateSpec, type GenerateSpecDeps } from './generateSpec';
 import type { FigmaSyncConfig } from 'figma-sync-core';
 import { zFigmaInstructionSet } from 'figma-sync-core';
 import type { CodeModel } from 'figma-sync-core';
+import type { LLMClient } from 'figma-sync-core';
 
 const config: FigmaSyncConfig = {
   projectName: 'Test Project',
@@ -123,6 +124,91 @@ describe('runGenerateSpec', () => {
     const instructions = JSON.parse(written[instructionsPath]!);
     const parsed = zFigmaInstructionSet.parse(instructions);
     expect(parsed.version).toBe('1.0');
+  });
+
+  it('enriches components when an LLM client is provided', async () => {
+    const files: Record<string, string> = {
+      '/repo/artifacts/code-model.json': JSON.stringify(codeModel),
+    };
+    const written: Record<string, string> = {};
+    const llmPrompts: string[] = [];
+
+    const llm: LLMClient = {
+      async generate(prompt: string): Promise<string> {
+        llmPrompts.push(prompt);
+        return 'unused';
+      },
+      async generateJSON(prompt, schema) {
+        llmPrompts.push(prompt);
+        return schema.parse({
+          components: [
+            {
+              name: 'Button',
+              propsModel: {
+                variantProps: [
+                  { name: 'variant', type: 'enum', values: ['primary', 'secondary'] },
+                ],
+                slotProps: [],
+              },
+              exampleVariants: [
+                { name: 'Primary', props: { variant: 'primary' } },
+              ],
+            },
+          ],
+        }) as any;
+      },
+    };
+
+    const deps: GenerateSpecDeps = {
+      loadConfigFromFile: async () => config,
+      readFile: async (filePath) => files[filePath]!,
+      writeFile: async (filePath, content) => {
+        written[filePath] = content;
+      },
+      cwd: '/repo',
+      createLLMClient: () => llm,
+    };
+
+    await runGenerateSpec('figma-sync.config.json', deps);
+
+    const specPath = '/repo/artifacts/design-spec.json';
+    const spec = JSON.parse(written[specPath]!);
+
+    expect(spec.components[0].propsModel.variantProps).toEqual([
+      { name: 'variant', type: 'enum', values: ['primary', 'secondary'] },
+    ]);
+    expect(spec.components[0].exampleVariants[0]).toMatchObject({
+      name: 'Primary',
+      props: { variant: 'primary' },
+    });
+    expect(llmPrompts.length).toBeGreaterThan(0);
+  });
+
+  it('skips enrichment when createLLMClient returns null', async () => {
+    const files: Record<string, string> = {
+      '/repo/artifacts/code-model.json': JSON.stringify(codeModel),
+    };
+    const written: Record<string, string> = {};
+
+    const deps: GenerateSpecDeps = {
+      loadConfigFromFile: async () => config,
+      readFile: async (filePath) => files[filePath]!,
+      writeFile: async (filePath, content) => {
+        written[filePath] = content;
+      },
+      cwd: '/repo',
+      createLLMClient: () => null,
+    };
+
+    await runGenerateSpec('figma-sync.config.json', deps);
+
+    const specPath = '/repo/artifacts/design-spec.json';
+    const spec = JSON.parse(written[specPath]!);
+
+    expect(spec.components[0].propsModel).toEqual({
+      variantProps: [],
+      slotProps: [],
+    });
   });
 });
 

@@ -67,5 +67,34 @@ describe('extractCssDesignTokens', () => {
       fontSize: 16,
     });
   });
+
+  it('defaults numeric unit to px when no explicit unit is given', () => {
+    const css = `:root {\n  --radius-md: 10;\n}`;
+
+    const tokens = extractCssDesignTokens({
+      filePath: 'src/styles/tokens.css',
+      content: css,
+    });
+
+    expect(tokens.radii).toHaveLength(1);
+    expect(tokens.radii[0]).toMatchObject({
+      name: '--radius-md',
+      value: 10,
+      unit: 'px',
+    });
+  });
+
+  it('ignores numeric variables that do not match radius, spacing or font-size patterns', () => {
+    const css = `:root {\n  --other-size: 12px;\n}`;
+
+    const tokens = extractCssDesignTokens({
+      filePath: 'src/styles/tokens.css',
+      content: css,
+    });
+
+    expect(tokens.radii).toHaveLength(0);
+    expect(tokens.spacing).toHaveLength(0);
+    expect(tokens.typography).toHaveLength(0);
+  });
 });
 

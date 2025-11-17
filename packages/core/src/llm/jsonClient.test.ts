@@ -13,6 +13,18 @@ describe('extractFirstJson', () => {
   it('returns null if no JSON found', () => {
     expect(extractFirstJson('no json here')).toBeNull();
   });
+
+  it('returns null when an opening brace never closes', () => {
+    const text = 'prefix { "a": 1 ';
+    expect(extractFirstJson(text)).toBeNull();
+  });
+
+  it('extracts JSON arrays when the first bracket is [', () => {
+    const text = 'Prefix [1, 2, 3] suffix';
+    const json = extractFirstJson(text);
+    expect(json).toBe('[1, 2, 3]');
+  });
+
 });
 
 describe('JsonLLMClient.generateJSON', () => {
@@ -40,6 +52,19 @@ describe('JsonLLMClient.generateJSON', () => {
 
     await expect(client.generateJSON('prompt', schema)).rejects.toThrow(
       /did not contain JSON block/,
+    );
+  });
+
+  it('throws if JSON parsing fails before schema validation', async () => {
+    const raw: RawLLMClient = {
+      async generate() {
+        return 'Here is broken JSON: {"a": invalid}';
+      },
+    };
+    const client = new JsonLLMClient(raw);
+
+    await expect(client.generateJSON('prompt', schema)).rejects.toThrow(
+      /Failed to parse JSON from LLM response/,
     );
   });
 

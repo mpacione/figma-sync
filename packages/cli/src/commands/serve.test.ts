@@ -52,6 +52,7 @@ describe('createServeHandler', () => {
       '/repo/artifacts/design-spec.json': JSON.stringify({ version: '1.0' }),
       '/repo/artifacts/figma-instructions.json': JSON.stringify({ version: '1.0' }),
       '/repo/artifacts/code-patches.json': JSON.stringify({ version: '1.0' }),
+      '/repo/artifacts/figma-changes.json': JSON.stringify({ version: '1.0', changes: [] }),
     };
 
     const deps: ServeDeps = {
@@ -81,10 +82,49 @@ describe('createServeHandler', () => {
       expect(JSON.parse(mock.body)).toEqual({ status: 'ok' });
     }
 
+    // /
+    {
+      const mock = createMockResponse();
+      await handler({ method: 'GET', url: '/' }, mock.res);
+      expect(mock.res.statusCode).toBe(200);
+      const body = JSON.parse(mock.body);
+      expect(body.endpoints).toContain('/code-model');
+      expect(body.endpoints).toContain('/design-spec');
+      expect(body.endpoints).toContain('/figma-changes');
+    }
+
     // /code-model
     {
       const mock = createMockResponse();
       await handler({ method: 'GET', url: '/code-model' }, mock.res);
+      expect(mock.res.statusCode).toBe(200);
+      expect(JSON.parse(mock.body)).toEqual({ version: '1.0' });
+    }
+
+    // /design-spec and /spec
+    {
+      const mock = createMockResponse();
+      await handler({ method: 'GET', url: '/design-spec' }, mock.res);
+      expect(mock.res.statusCode).toBe(200);
+      expect(JSON.parse(mock.body)).toEqual({ version: '1.0' });
+    }
+    {
+      const mock = createMockResponse();
+      await handler({ method: 'GET', url: '/spec' }, mock.res);
+      expect(mock.res.statusCode).toBe(200);
+      expect(JSON.parse(mock.body)).toEqual({ version: '1.0' });
+    }
+
+    // /figma-instructions and /instructions
+    {
+      const mock = createMockResponse();
+      await handler({ method: 'GET', url: '/figma-instructions' }, mock.res);
+      expect(mock.res.statusCode).toBe(200);
+      expect(JSON.parse(mock.body)).toEqual({ version: '1.0' });
+    }
+    {
+      const mock = createMockResponse();
+      await handler({ method: 'GET', url: '/instructions' }, mock.res);
       expect(mock.res.statusCode).toBe(200);
       expect(JSON.parse(mock.body)).toEqual({ version: '1.0' });
     }
@@ -95,6 +135,14 @@ describe('createServeHandler', () => {
       await handler({ method: 'GET', url: '/code-patches' }, mock.res);
       expect(mock.res.statusCode).toBe(200);
       expect(JSON.parse(mock.body)).toEqual({ version: '1.0' });
+    }
+
+    // /figma-changes (GET)
+    {
+      const mock = createMockResponse();
+      await handler({ method: 'GET', url: '/figma-changes' }, mock.res);
+      expect(mock.res.statusCode).toBe(200);
+      expect(JSON.parse(mock.body)).toEqual({ version: '1.0', changes: [] });
     }
 
     // POST /figma-changes
@@ -119,6 +167,93 @@ describe('createServeHandler', () => {
       await handler({ method: 'GET', url: '/unknown' }, res);
       expect(res.statusCode).toBe(404);
     }
+  });
+});
+
+
+describe('createServeHandler error handling', () => {
+  it('returns 404 and logs when an artifact file is missing', async () => {
+    const logs: string[] = [];
+
+    const deps: ServeDeps = {
+      loadConfigFromFile: async () => config,
+      readFile: async () => {
+        throw new Error('should not be called');
+      },
+      writeFile: async () => {
+        throw new Error('should not be called');
+      },
+      fileExists: async () => false,
+      log: (message) => {
+        logs.push(message);
+      },
+      cwd: '/repo',
+    };
+
+    const handler = await createServeHandler('figma-sync.config.json', deps);
+    const mock = createMockResponse();
+
+    await handler({ method: 'GET', url: '/code-model' }, mock.res);
+
+    expect(mock.res.statusCode).toBe(404);
+    expect(logs.some((l) => l.includes('CodeModel'))).toBe(true);
+  });
+
+  it('returns 500 and logs when reading an artifact fails', async () => {
+    const logs: string[] = [];
+
+    const deps: ServeDeps = {
+      loadConfigFromFile: async () => config,
+      readFile: async () => {
+        throw new Error('boom');
+      },
+      writeFile: async () => {
+        throw new Error('should not be called');
+      },
+      fileExists: async () => true,
+      log: (message) => {
+        logs.push(message);
+      },
+      cwd: '/repo',
+    };
+
+    const handler = await createServeHandler('figma-sync.config.json', deps);
+    const mock = createMockResponse();
+
+    await handler({ method: 'GET', url: '/design-spec' }, mock.res);
+
+    expect(mock.res.statusCode).toBe(500);
+    expect(logs.some((l) => l.includes('DesignSpec'))).toBe(true);
+  });
+
+  it('returns 400 when POST /figma-changes has invalid payload', async () => {
+    const logs: string[] = [];
+
+    const deps: ServeDeps = {
+      loadConfigFromFile: async () => config,
+      readFile: async () => '{"version":"1.0"}',
+      writeFile: async () => {
+        throw new Error('should not be called');
+      },
+      fileExists: async () => false,
+      log: (message) => {
+        logs.push(message);
+      },
+      cwd: '/repo',
+    };
+
+    const handler = await createServeHandler('figma-sync.config.json', deps);
+    const mock = createMockResponse();
+
+    await handler({ method: 'POST', url: '/figma-changes', body: 'not-json' }, mock.res);
+
+    expect(mock.res.statusCode).toBe(400);
+    expect(mock.body).toBe('Invalid FigmaChangeSet payload');
+    expect(
+      logs.some((l) =>
+        l.includes('FigmaChangeSet: error parsing or writing change set'),
+      ),
+    ).toBe(true);
   });
 });
 

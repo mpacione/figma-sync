@@ -27,6 +27,7 @@ describe('runCli', () => {
     expect(code).toBe(0);
     expect(nodeEnv.runScanWithNodeEnv).toHaveBeenCalledWith(
       'figma-sync.config.json',
+      undefined,
     );
   });
 

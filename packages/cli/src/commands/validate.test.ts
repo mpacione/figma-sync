@@ -111,5 +111,41 @@ describe('runValidate', () => {
     expect(logs.some((l) => l.includes('FigmaInstructionSet'))).toBe(true);
     expect(logs.some((l) => l.includes('CodePatchSet'))).toBe(true);
   });
+
+  it('logs missing artifacts and skips validation when files are absent', async () => {
+    const files: Record<string, string> = {
+      '/repo/artifacts/code-model.json': JSON.stringify(codeModel),
+    };
+
+    const logs: string[] = [];
+
+    const deps: ValidateDeps = {
+      loadConfigFromFile: async () => config,
+      readFile: async (filePath) => {
+        const content = files[filePath];
+        if (!content) throw new Error(`Missing file: ${filePath}`);
+        return content;
+      },
+      fileExists: async (filePath) => !!files[filePath],
+      log: (message) => {
+        logs.push(message);
+      },
+      cwd: '/repo',
+    };
+
+    await runValidate('figma-sync.config.json', deps);
+
+    expect(logs.some((l) => l.includes('CodeModel'))).toBe(true);
+    expect(logs.some((l) => l.includes('DesignSpec') && l.includes('missing'))).toBe(
+      true,
+    );
+    expect(
+      logs.some((l) => l.includes('FigmaInstructionSet') && l.includes('missing')),
+    ).toBe(true);
+    expect(logs.some((l) => l.includes('CodePatchSet') && l.includes('missing'))).toBe(
+      true,
+    );
+  });
+
 });
 

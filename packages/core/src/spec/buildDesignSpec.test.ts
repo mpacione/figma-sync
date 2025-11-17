@@ -190,5 +190,23 @@ describe('buildDesignSpec', () => {
     ).toBeDefined();
     expect(spec.mapping.routeToScreenId['/login']).toBeDefined();
   });
+
+  it('names the root route screen as Home', () => {
+    const rootOnlyModel: CodeModel = {
+      ...codeModel,
+      screens: [
+        {
+          route: '/',
+          componentName: 'Page',
+          filePath: 'app/page.tsx',
+          usesComponents: [],
+          description: undefined,
+        },
+      ],
+    };
+
+    const spec = buildDesignSpec(rootOnlyModel, config);
+    expect(spec.screens[0]).toMatchObject({ name: 'Home', route: '/' });
+  });
 });
 

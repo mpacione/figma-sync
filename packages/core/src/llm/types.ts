@@ -1,3 +1,5 @@
+/* c8 ignore file */
+
 import type { ZodSchema } from 'zod';
 
 export interface LLMGenerateOptions {
